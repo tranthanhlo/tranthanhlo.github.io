@@ -3,8 +3,8 @@ import { defineConfig } from 'astro/config';
 import sitemap from '@astrojs/sitemap';
 
 export default defineConfig({
-  // TODO: change to the real domain once the blog is online (used by RSS and the sitemap)
-  site: 'https://example.com',
+  // Used by RSS and the sitemap. Change it if the blog moves to a custom domain.
+  site: 'https://tranthanhlo.github.io',
   integrations: [sitemap()],
   markdown: {
     shikiConfig: {

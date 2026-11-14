@@ -65,7 +65,9 @@ Màu sắc và kiểu chữ nằm trong `src/styles/global.css`. Tên blog, mô 
 
 ## Đưa lên mạng
 
-Chạy `npm run build`, kết quả nằm trong thư mục `dist/`. Thư mục này đưa lên Vercel, Netlify, Cloudflare Pages hay GitHub Pages được, miễn phí. Khi có tên miền, sửa `site` trong `astro.config.mjs` để RSS và sitemap có đường dẫn đúng.
+Blog chạy trên GitHub Pages tại https://tranthanhlo.github.io. Mỗi lần đẩy code lên nhánh `main`, GitHub tự build và cập nhật web (xem `.github/workflows/deploy.yml`, tiến trình nằm ở tab Actions của repo).
+
+Khi có tên miền riêng, sửa `site` trong `astro.config.mjs` để RSS và sitemap có đường dẫn đúng.
 
 ## Bản 3D cũ
 
