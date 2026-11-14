@@ -1,17 +1,26 @@
 ---
 import ThemeToggle from './ThemeToggle.astro';
 import { SITE } from '../site';
+import { otherLang, paths, t, type Alternate, type Lang } from '../i18n';
 
+interface Props {
+  lang: Lang;
+  alt: Alternate;
+}
+
+const { lang, alt } = Astro.props;
+const other = otherLang(lang);
 const path = Astro.url.pathname;
+const p = paths(lang);
 const links = [
-  { href: '/blog', label: 'Bài viết' },
-  { href: '/ve-toi', label: 'Về tôi' },
+  { href: p.blog, label: t(lang).navPosts },
+  { href: p.about, label: t(lang).navAbout },
 ];
 ---
 
 <header class="wrap site-header">
-  <a class="name" href="/">{SITE.title}</a>
-  <nav aria-label="Chính">
+  <a class="name" href={p.home}>{SITE.title}</a>
+  <nav aria-label={t(lang).navMain}>
     {
       links.map((l) => (
         <a href={l.href} aria-current={path.startsWith(l.href) ? 'page' : undefined}>
@@ -19,7 +28,10 @@ const links = [
         </a>
       ))
     }
-    <ThemeToggle />
+    <a class="lang" href={alt.href} hreflang={other} lang={other} aria-label={t(other).switchLabel}>
+      {other.toUpperCase()}
+    </a>
+    <ThemeToggle lang={lang} />
   </nav>
 </header>
 
@@ -28,23 +40,28 @@ const links = [
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
-    padding-top: calc(28px + env(safe-area-inset-top, 0px));
-    padding-bottom: 28px;
+    gap: 12px;
+    padding-top: calc(18px + env(safe-area-inset-top, 0px));
+    padding-bottom: 18px;
   }
   .name {
     font-family: var(--display);
     font-size: 24px;
     text-decoration: none;
     white-space: nowrap;
+    padding: 8px 0;
   }
   nav {
     display: flex;
     align-items: center;
-    gap: 22px;
+    gap: 18px;
     font-size: 14px;
   }
+  /* padding gives each link a 44px tall tap area without changing how it looks */
   nav a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
     text-decoration: none;
     color: var(--soft);
   }
@@ -53,8 +70,14 @@ const links = [
     text-decoration: underline;
     text-decoration-color: var(--accent);
   }
+  .lang {
+    min-width: 32px;
+    justify-content: center;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+  }
   @media (max-width: 420px) {
-    nav { gap: 14px; }
-    .name { font-size: 21px; }
+    nav { gap: 12px; }
+    .name { font-size: 20px; }
   }
 </style>

@@ -1,0 +1,15 @@
+---
+import TagView from '../../../views/TagView.astro';
+import { tagPaths, type Post } from '../../../site';
+
+export const getStaticPaths = () => tagPaths('en');
+
+interface Props {
+  tag: string;
+  posts: Post[];
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<TagView lang="en" tag={tag} posts={posts} />

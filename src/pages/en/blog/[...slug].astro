@@ -1,0 +1,22 @@
+---
+import { render } from 'astro:content';
+import PostLayout from '../../../layouts/PostLayout.astro';
+import { postPaths, type Post } from '../../../site';
+import type { Alternate } from '../../../i18n';
+
+export const getStaticPaths = () => postPaths('en');
+
+interface Props {
+  post: Post;
+  prev?: Post;
+  next?: Post;
+  alt: Alternate;
+}
+
+const { post, prev, next, alt } = Astro.props;
+const { Content, headings } = await render(post);
+---
+
+<PostLayout post={post} headings={headings} lang="en" alt={alt} prev={prev} next={next}>
+  <Content />
+</PostLayout>

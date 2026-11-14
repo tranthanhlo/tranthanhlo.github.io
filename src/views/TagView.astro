@@ -1,0 +1,36 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import PostList from '../components/PostList.astro';
+import type { Post } from '../site';
+import { otherLang, paths, t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+  tag: string;
+  posts: Post[];
+}
+
+const { lang, tag, posts } = Astro.props;
+const ui = t(lang);
+---
+
+<BaseLayout
+  title={`#${tag}`}
+  description={ui.tagDescription(tag)}
+  lang={lang}
+  alt={{ href: paths(otherLang(lang)).blog, exact: false }}
+>
+  <div class="wrap">
+    <p class="eyebrow"><a href={paths(lang).blog}>{ui.postsTitle}</a> / {ui.tagCrumb}</p>
+    <h1>#{tag}</h1>
+    <p class="intro">{ui.tagCount(posts.length)}</p>
+    <PostList posts={posts} lang={lang} />
+  </div>
+</BaseLayout>
+
+<style>
+  .eyebrow { margin-top: 20px; }
+  .eyebrow a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
+  h1 { font-size: clamp(42px, 8vw, 60px); margin: 0 0 4px; color: var(--accent); }
+  .intro { margin: 0 0 40px; color: var(--soft); }
+</style>

@@ -50,18 +50,28 @@ cover: ./pho-co.jpg
 coverAlt: Phố cổ Hội An lúc chiều
 ```
 
+### Thêm bản tiếng Anh cho một bài
+
+Blog có bản tiếng Anh ở `/en/`. Bên đó chỉ hiện những bài đã có bản dịch.
+
+1. Tạo file **cùng tên** với bài tiếng Việt trong `src/content/en/`. Ví dụ `src/content/blog/mot-ngay-o-hoi-an.md` thì bản dịch là `src/content/en/mot-ngay-o-hoi-an.md`.
+2. Frontmatter giống bài tiếng Việt, nhưng `title`, `description` và `tags` viết bằng tiếng Anh.
+3. Nút **EN / VI** trên đầu trang sẽ tự chuyển thẳng giữa hai bản của bài. Bài chưa dịch thì nút EN dẫn về danh sách bài tiếng Anh.
+
+Chữ trên giao diện (menu, nút, chân trang…) của cả hai thứ tiếng nằm trong `src/i18n.ts`.
+
 ## Cấu trúc
 
 | Đường dẫn | File |
 |---|---|
-| `/` | `src/pages/index.astro` |
-| `/blog` | `src/pages/blog/index.astro` |
-| `/blog/<bài>` | `src/layouts/PostLayout.astro` |
-| `/the/<thẻ>` | `src/pages/the/[tag].astro` |
-| `/ve-toi` | `src/pages/ve-toi.astro` |
-| `/rss.xml` | `src/pages/rss.xml.js` |
+| `/` và `/en/` | `src/views/HomeView.astro` |
+| `/blog` và `/en/blog` | `src/views/BlogIndexView.astro` |
+| `/blog/<bài>` và `/en/blog/<bài>` | `src/layouts/PostLayout.astro` |
+| `/the/<thẻ>` và `/en/tags/<thẻ>` | `src/views/TagView.astro` |
+| `/ve-toi` và `/en/about` | `src/views/AboutView.astro` |
+| `/rss.xml` và `/en/rss.xml` | `src/rss.ts` |
 
-Màu sắc và kiểu chữ nằm trong `src/styles/global.css`. Tên blog, mô tả và link LinkedIn nằm trong `src/site.ts`.
+Các file trong `src/pages/` chỉ gọi tới những file trên, kèm ngôn ngữ. Màu sắc và kiểu chữ nằm trong `src/styles/global.css`. Tên blog và link LinkedIn nằm trong `src/site.ts`.
 
 ## Đưa lên mạng
 

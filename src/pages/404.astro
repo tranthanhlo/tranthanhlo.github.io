@@ -2,18 +2,28 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
-<BaseLayout title="Không tìm thấy trang">
+<!-- one 404 page for both languages -->
+<BaseLayout title="Không tìm thấy trang · Page not found">
   <div class="wrap lost">
     <p class="eyebrow">Lỗi 404</p>
     <h1>Trang này trôi theo dòng sông Hàn mất rồi.</h1>
     <p>Có thể đường dẫn bị gõ nhầm, hoặc bài viết đã được đổi tên.</p>
     <p><a href="/">Về trang chủ →</a></p>
+
+    <div lang="en" class="en">
+      <p class="eyebrow">Error 404</p>
+      <p class="h">This page has drifted away down the Han River.</p>
+      <p>The link may be mistyped, or the post may have been renamed.</p>
+      <p><a href="/en/">Back to the home page →</a></p>
+    </div>
   </div>
 </BaseLayout>
 
 <style>
   .lost { margin-top: 56px; }
   h1 { font-size: clamp(36px, 7vw, 54px); margin: 10px 0 18px; }
-  p { color: var(--soft); }
-  a { color: var(--accent); text-decoration: none; }
+  p { color: var(--soft); margin: 0 0 8px; }
+  a { display: inline-flex; align-items: center; min-height: 44px; color: var(--accent); text-decoration: none; }
+  .en { margin-top: 48px; padding-top: 32px; border-top: 1px solid var(--line); }
+  .h { font-family: var(--display); font-size: 28px; line-height: 1.2; color: var(--ink); margin: 8px 0 12px; }
 </style>

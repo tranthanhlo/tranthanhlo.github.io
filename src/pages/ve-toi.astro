@@ -1,36 +1,5 @@
 ---
-import BaseLayout from '../layouts/BaseLayout.astro';
-import { SITE } from '../site';
+import AboutView from '../views/AboutView.astro';
 ---
 
-<BaseLayout title="Về tôi" description="Đôi điều về Trần Thanh Lộ.">
-  <article class="wrap">
-    <p class="eyebrow">Về tôi</p>
-    <h1>Trần Thanh Lộ</h1>
-
-    <div class="prose">
-      <p>
-        Tôi sống và làm việc ở Đà Nẵng. Công việc hằng ngày của tôi là viết phần mềm cho ngành xây dựng: plugin và công cụ
-        tự động hóa cho Revit và ArchiCAD, bằng C# và C++. Hiện tôi làm BIM/CAD Software Developer tại Prima Solutions, và
-        đang tìm hiểu thêm AutoCAD, Tekla.
-      </p>
-      <p>Tôi học ở Đại học Bách khoa, Đại học Đà Nẵng.</p>
-
-      <!-- TODO: kể thêm về bản thân ngoài công việc: sở thích, điều bạn quan tâm, vì sao lập blog này. -->
-
-      <h2>Blog này</h2>
-      <p>
-        Không có lịch đăng, không có chủ đề cố định. Có bài về công việc, có bài chẳng liên quan gì tới công việc cả. Nếu
-        muốn theo dõi, bạn có thể dùng <a href="/rss.xml">RSS</a>.
-      </p>
-
-      <h2>Liên lạc</h2>
-      <p>Cách nhanh nhất là nhắn cho tôi qua <a href={SITE.linkedin} rel="me noopener" target="_blank">LinkedIn</a>.</p>
-    </div>
-  </article>
-</BaseLayout>
-
-<style>
-  .eyebrow { margin-top: 32px; }
-  h1 { font-size: clamp(42px, 8vw, 60px); margin: 8px 0 32px; }
-</style>
+<AboutView lang="vi" />

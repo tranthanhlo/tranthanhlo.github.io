@@ -1,4 +1,15 @@
-<button class="theme-toggle" type="button" aria-label="Đổi giao diện sáng/tối" title="Đổi giao diện sáng/tối">
+---
+import { t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
+---
+
+<!-- a toggle: aria-pressed tells screen readers whether dark mode is on -->
+<button class="theme-toggle" type="button" aria-label={t(lang).themeToggle} title={t(lang).themeToggle} aria-pressed="false">
   <svg class="sun" viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
     <circle cx="12" cy="12" r="4.2" fill="none" stroke="currentColor" stroke-width="1.3"></circle>
     <path d="M12 2.5v2.2M12 19.3v2.2M4.5 12H2.3M21.7 12h-2.2M5.6 5.6l1.5 1.5M16.9 16.9l1.5 1.5M5.6 18.4l1.5-1.5M16.9 7.1l1.5-1.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"></path>
@@ -9,21 +20,33 @@
 </button>
 
 <script>
-  for (const btn of document.querySelectorAll<HTMLButtonElement>('.theme-toggle')) {
+  const root = document.documentElement;
+  const themeColor = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  const buttons = document.querySelectorAll<HTMLButtonElement>('.theme-toggle');
+
+  function sync() {
+    const dark = root.dataset.theme === 'dark';
+    for (const btn of buttons) btn.setAttribute('aria-pressed', String(dark));
+    if (themeColor) themeColor.content = dark ? '#0c0e11' : '#f6f1e7';
+  }
+
+  for (const btn of buttons) {
     btn.addEventListener('click', () => {
-      const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
-      document.documentElement.dataset.theme = next;
+      const next = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      root.dataset.theme = next;
       try { localStorage.setItem('theme', next); } catch {}
+      sync();
     });
   }
+  sync();
 </script>
 
 <style>
   .theme-toggle {
     display: inline-grid;
     place-items: center;
-    width: 34px;
-    height: 34px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border: 1px solid var(--line);
     border-radius: 50%;

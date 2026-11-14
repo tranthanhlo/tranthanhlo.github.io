@@ -1,14 +1,18 @@
 ---
+import { t, type Lang } from '../i18n';
+
 interface Props {
   date: Date;
+  lang?: Lang;
   short?: boolean;
 }
 
-const { date, short = false } = Astro.props;
-// e.g. "14 tháng 11, 2026", or "14/11" in lists
+const { date, lang = 'vi', short = false } = Astro.props;
+const locale = t(lang).dateLocale;
+// e.g. "14 tháng 11, 2026" / "November 14, 2026", or "14/11" / "Nov 14" in lists
 const text = short
-  ? date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
-  : date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' });
+  ? date.toLocaleDateString(locale, lang === 'vi' ? { day: '2-digit', month: '2-digit' } : { day: 'numeric', month: 'short' })
+  : date.toLocaleDateString(locale, { day: 'numeric', month: 'long', year: 'numeric' });
 ---
 
 <time datetime={date.toISOString()}>{text}</time>

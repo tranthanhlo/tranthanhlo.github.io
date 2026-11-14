@@ -1,5 +1,12 @@
 ---
 import { SITE } from '../site';
+import { paths, t, type Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+
+const { lang } = Astro.props;
 const year = new Date().getFullYear();
 ---
 
@@ -22,9 +29,9 @@ const year = new Date().getFullYear();
     ></path>
   </svg>
   <div class="row">
-    <p>© {year} {SITE.author} · Viết từ Đà Nẵng</p>
+    <p>© {year} {SITE.author} · {t(lang).footerFrom}</p>
     <p class="links">
-      <a href="/rss.xml">RSS</a>
+      <a href={paths(lang).rss}>RSS</a>
       <a href={SITE.linkedin} rel="me noopener" target="_blank">LinkedIn</a>
     </p>
   </div>
@@ -33,7 +40,7 @@ const year = new Date().getFullYear();
 <style>
   .site-footer {
     margin-top: 96px;
-    padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(28px + env(safe-area-inset-bottom, 0px));
     color: var(--faint);
     font-size: 13px;
   }
@@ -47,12 +54,14 @@ const year = new Date().getFullYear();
   .row {
     display: flex;
     flex-wrap: wrap;
+    align-items: center;
     justify-content: space-between;
-    gap: 8px 24px;
+    gap: 0 24px;
     border-top: 1px solid var(--line);
-    padding-top: 18px;
+    padding-top: 6px;
   }
   p { margin: 0; }
-  .links { display: flex; gap: 18px; }
-  a { text-decoration: none; }
+  .links { display: flex; gap: 20px; }
+  /* 44px tall tap area */
+  a { display: inline-flex; align-items: center; min-height: 44px; text-decoration: none; }
 </style>

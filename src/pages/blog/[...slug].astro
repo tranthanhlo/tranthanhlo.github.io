@@ -1,27 +1,22 @@
 ---
 import { render } from 'astro:content';
 import PostLayout from '../../layouts/PostLayout.astro';
-import { getPosts, type Post } from '../../site';
+import { postPaths, type Post } from '../../site';
+import type { Alternate } from '../../i18n';
 
-export async function getStaticPaths() {
-  const posts = await getPosts();
-  // posts are newest first, so the "previous" (older) post is the next one in the list
-  return posts.map((post, i) => ({
-    params: { slug: post.id },
-    props: { post, prev: posts[i + 1], next: posts[i - 1] },
-  }));
-}
+export const getStaticPaths = () => postPaths('vi');
 
 interface Props {
   post: Post;
   prev?: Post;
   next?: Post;
+  alt: Alternate;
 }
 
-const { post, prev, next } = Astro.props;
+const { post, prev, next, alt } = Astro.props;
 const { Content, headings } = await render(post);
 ---
 
-<PostLayout post={post} headings={headings} prev={prev} next={next}>
+<PostLayout post={post} headings={headings} lang="vi" alt={alt} prev={prev} next={next}>
   <Content />
 </PostLayout>

@@ -4,25 +4,31 @@ import type { MarkdownHeading } from 'astro';
 import BaseLayout from './BaseLayout.astro';
 import FormattedDate from '../components/FormattedDate.astro';
 import { readingTime, tagSlug, type Post } from '../site';
+import { paths, t, type Alternate, type Lang } from '../i18n';
 
 interface Props {
   post: Post;
   headings: MarkdownHeading[];
+  lang: Lang;
+  alt: Alternate;
   prev?: Post;
   next?: Post;
 }
 
-const { post, headings, prev, next } = Astro.props;
+const { post, headings, lang, alt, prev, next } = Astro.props;
 const { title, description, date, updated, tags, cover, coverAlt } = post.data;
 const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const ui = t(lang);
+const p = paths(lang);
 ---
 
-<BaseLayout title={title} description={description}>
-  <article class="wrap">
+<BaseLayout title={title} description={description} lang={lang} alt={alt}>
+  <div class="progress" aria-hidden="true"></div>
+  <article class="wrap" data-copy={ui.copy} data-copied={ui.copied}>
     <header class="post-head">
       <p class="eyebrow">
-        <FormattedDate date={date} /> · {readingTime(post.body)} phút đọc
-        {updated && <span> · cập nhật <FormattedDate date={updated} /></span>}
+        <FormattedDate date={date} lang={lang} /> · {ui.minRead(readingTime(post.body))}
+        {updated && <span> · {ui.updated} <FormattedDate date={updated} lang={lang} /></span>}
       </p>
       <h1>{title}</h1>
       <p class="lead">{description}</p>
@@ -33,7 +39,7 @@ const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
     {
       toc.length >= 3 && (
         <details class="toc">
-          <summary>Trong bài này</summary>
+          <summary>{ui.toc}</summary>
           <ol>
             {toc.map((h) => (
               <li class={`d${h.depth}`}>
@@ -52,8 +58,8 @@ const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
     {
       tags.length > 0 && (
         <p class="tags">
-          {tags.map((t) => (
-            <a href={`/the/${tagSlug(t)}`}>#{t}</a>
+          {tags.map((tag) => (
+            <a href={p.tag(tagSlug(tag))}>#{tag}</a>
           ))}
         </p>
       )
@@ -61,18 +67,18 @@ const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
 
     {
       (prev || next) && (
-        <nav class="pager" aria-label="Bài khác">
+        <nav class="pager" aria-label={ui.otherPosts}>
           {prev ? (
-            <a class="older" href={`/blog/${prev.id}`}>
-              <span class="eyebrow">Bài trước</span>
+            <a class="older" href={p.post(prev.id)}>
+              <span class="eyebrow">{ui.prev}</span>
               {prev.data.title}
             </a>
           ) : (
             <span />
           )}
           {next && (
-            <a class="newer" href={`/blog/${next.id}`}>
-              <span class="eyebrow">Bài sau</span>
+            <a class="newer" href={p.post(next.id)}>
+              <span class="eyebrow">{ui.next}</span>
               {next.data.title}
             </a>
           )}
@@ -82,7 +88,65 @@ const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
   </article>
 </BaseLayout>
 
+<script>
+  // "Copy" button on every code block
+  const article = document.querySelector<HTMLElement>('article[data-copy]');
+  if (article) {
+    const { copy = 'Copy', copied = 'Copied' } = article.dataset;
+    for (const pre of article.querySelectorAll<HTMLPreElement>('.prose pre')) {
+      const box = document.createElement('div');
+      box.className = 'code-block';
+      pre.replaceWith(box);
+      box.append(pre);
+
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'copy';
+      btn.textContent = copy;
+      let timer: number | undefined;
+      btn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(pre.innerText);
+          btn.textContent = copied;
+          clearTimeout(timer);
+          timer = window.setTimeout(() => (btn.textContent = copy), 2000);
+        } catch {}
+      });
+      box.append(btn);
+    }
+  }
+
+  // thin reading-progress line at the top of the page
+  const bar = document.querySelector<HTMLElement>('.progress');
+  if (bar) {
+    let queued = false;
+    const update = () => {
+      queued = false;
+      const max = document.documentElement.scrollHeight - innerHeight;
+      bar.style.transform = `scaleX(${max > 0 ? Math.min(1, scrollY / max) : 0})`;
+    };
+    addEventListener('scroll', () => {
+      if (!queued) { queued = true; requestAnimationFrame(update); }
+    }, { passive: true });
+    addEventListener('resize', update);
+    update();
+  }
+</script>
+
 <style>
+  .progress {
+    position: fixed;
+    inset: 0 0 auto 0;
+    height: 2px;
+    background: var(--accent);
+    transform: scaleX(0);
+    transform-origin: left;
+    z-index: 10;
+    pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .progress { display: none; }
+  }
   .post-head { margin: 32px 0 36px; }
   h1 {
     margin: 10px 0 14px;
@@ -106,34 +170,44 @@ const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
   }
   .toc {
     margin: 0 0 36px;
-    padding: 14px 0;
+    padding: 4px 0;
     border-top: 1px solid var(--line);
     border-bottom: 1px solid var(--line);
     font-size: 15px;
   }
   .toc summary {
+    display: flex;
+    align-items: center;
+    min-height: 44px;
     cursor: pointer;
     font-size: 12px;
     letter-spacing: 0.18em;
     text-transform: uppercase;
     color: var(--faint);
   }
-  .toc ol { margin: 10px 0 0; padding-left: 1.2em; }
+  .toc ol { margin: 0 0 10px; padding-left: 1.2em; }
+  .toc li { padding: 2px 0; }
   .toc .d3 { margin-left: 1em; list-style: circle; }
   .toc a { text-decoration: none; color: var(--soft); }
   .tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px 16px;
-    margin: 48px 0 0;
+    gap: 0 18px;
+    margin: 40px 0 0;
     font-size: 14px;
   }
-  .tags a { color: var(--accent); text-decoration: none; }
+  .tags a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    color: var(--accent);
+    text-decoration: none;
+  }
   .pager {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 24px;
-    margin-top: 40px;
+    margin-top: 32px;
     padding-top: 24px;
     border-top: 1px solid var(--line);
   }
@@ -152,4 +226,24 @@ const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
     .pager { grid-template-columns: 1fr; }
     .newer { grid-column: 1; text-align: left; }
   }
+
+  /* the copy button is added by the script above, so its styles must be global */
+  :global(.code-block) { position: relative; }
+  :global(.prose > .code-block) { margin-top: 1.25em; }
+  :global(.copy) {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    min-height: 32px;
+    padding: 4px 12px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--soft);
+    font: 12px/1 var(--sans);
+    cursor: pointer;
+    opacity: 0.85;
+    transition: opacity 0.2s, color 0.2s, border-color 0.2s;
+  }
+  :global(.copy:hover), :global(.copy:focus-visible) { opacity: 1; color: var(--accent); border-color: var(--accent); }
 </style>
