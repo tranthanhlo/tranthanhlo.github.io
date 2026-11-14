@@ -1,0 +1,14 @@
+---
+interface Props {
+  date: Date;
+  short?: boolean;
+}
+
+const { date, short = false } = Astro.props;
+// e.g. "14 tháng 11, 2026", or "14/11" in lists
+const text = short
+  ? date.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' })
+  : date.toLocaleDateString('vi-VN', { day: 'numeric', month: 'long', year: 'numeric' });
+---
+
+<time datetime={date.toISOString()}>{text}</time>

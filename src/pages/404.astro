@@ -1,0 +1,19 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout title="Không tìm thấy trang">
+  <div class="wrap lost">
+    <p class="eyebrow">Lỗi 404</p>
+    <h1>Trang này trôi theo dòng sông Hàn mất rồi.</h1>
+    <p>Có thể đường dẫn bị gõ nhầm, hoặc bài viết đã được đổi tên.</p>
+    <p><a href="/">Về trang chủ →</a></p>
+  </div>
+</BaseLayout>
+
+<style>
+  .lost { margin-top: 56px; }
+  h1 { font-size: clamp(36px, 7vw, 54px); margin: 10px 0 18px; }
+  p { color: var(--soft); }
+  a { color: var(--accent); text-decoration: none; }
+</style>

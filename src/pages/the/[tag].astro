@@ -1,0 +1,37 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import PostList from '../../components/PostList.astro';
+import { getPosts, tagSlug, type Post } from '../../site';
+
+export async function getStaticPaths() {
+  const posts = await getPosts();
+  const tags = [...new Set(posts.flatMap((p) => p.data.tags))];
+  return tags.map((tag) => ({
+    params: { tag: tagSlug(tag) },
+    props: { tag, posts: posts.filter((p) => p.data.tags.includes(tag)) },
+  }));
+}
+
+interface Props {
+  tag: string;
+  posts: Post[];
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<BaseLayout title={`#${tag}`} description={`Các bài viết có thẻ ${tag}.`}>
+  <div class="wrap">
+    <p class="eyebrow"><a href="/blog">Bài viết</a> / Thẻ</p>
+    <h1>#{tag}</h1>
+    <p class="intro">{posts.length} bài</p>
+    <PostList posts={posts} />
+  </div>
+</BaseLayout>
+
+<style>
+  .eyebrow { margin-top: 32px; }
+  .eyebrow a { text-decoration: none; }
+  h1 { font-size: clamp(42px, 8vw, 60px); margin: 8px 0 4px; color: var(--accent); }
+  .intro { margin: 0 0 40px; color: var(--soft); }
+</style>

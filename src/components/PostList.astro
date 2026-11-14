@@ -1,0 +1,50 @@
+---
+import FormattedDate from './FormattedDate.astro';
+import type { Post } from '../site';
+
+interface Props {
+  posts: Post[];
+  shortDates?: boolean;
+}
+
+const { posts, shortDates = false } = Astro.props;
+---
+
+<ul class="post-list">
+  {
+    posts.map((post) => (
+      <li>
+        <p class="eyebrow">
+          <FormattedDate date={post.data.date} short={shortDates} />
+          {post.data.draft && <span class="draft"> · Bản nháp</span>}
+        </p>
+        <h3>
+          <a href={`/blog/${post.id}`}>{post.data.title}</a>
+        </h3>
+        <p class="desc">{post.data.description}</p>
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .post-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 34px;
+  }
+  h3 {
+    margin: 4px 0 6px;
+    font-size: 27px;
+  }
+  h3 a { text-decoration: none; }
+  .desc {
+    margin: 0;
+    color: var(--soft);
+    font-size: 15.5px;
+    line-height: 1.65;
+  }
+  .draft { color: var(--accent); }
+</style>
