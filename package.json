@@ -1,17 +1,53 @@
 {
   "name": "tranthanhlo-web",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
+  "version": "0.2.0",
   "scripts": {
-    "dev": "astro dev",
-    "build": "astro build",
-    "preview": "astro preview",
-    "astro": "astro"
+    "dev": "next dev -p 4321 -H 0.0.0.0",
+    "build": "tsx scripts/migrate.ts && next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "db:seed": "tsx scripts/seed.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "tsx scripts/migrate.ts"
   },
   "dependencies": {
-    "@astrojs/rss": "^4.0.19",
-    "@astrojs/sitemap": "^3.7.5",
-    "astro": "^5.18.2"
+    "@auth/drizzle-adapter": "^1.11.3",
+    "@electric-sql/pglite": "^0.6.0",
+    "@neondatabase/serverless": "^1.2.1",
+    "@vercel/blob": "^2.9.0",
+    "drizzle-orm": "^0.45.4",
+    "marked": "^18.3.0",
+    "next": "^15.5.29",
+    "next-auth": "^5.0.0-beta.32",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "resend": "^6.40.0",
+    "sanitize-html": "^2.18.2",
+    "shiki": "^4.6.0"
+  },
+  "devDependencies": {
+    "@eslint/eslintrc": "^3.3.7",
+    "@tailwindcss/postcss": "^4.3.5",
+    "@types/node": "^26.6.11",
+    "@types/react": "^19.3.3",
+    "@types/react-dom": "^19.3.0",
+    "@types/sanitize-html": "^2.16.2",
+    "drizzle-kit": "^0.31.11",
+    "eslint": "^9.39.5",
+    "eslint-config-next": "^15.5.29",
+    "postcss": "^8.5.33",
+    "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3"
+  },
+  "overrides": {
+    "@vercel/cli-config": {
+      "zod": "^4.6.7"
+    },
+    "next": {
+      "postcss": "$postcss"
+    }
   }
 }

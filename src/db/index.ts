@@ -1,0 +1,28 @@
+import { mkdirSync } from 'node:fs';
+import type { PgDatabase, PgQueryResultHKT } from 'drizzle-orm/pg-core';
+import * as schema from './schema';
+
+export type DB = PgDatabase<PgQueryResultHKT, typeof schema>;
+
+// DATABASE_URL set → Neon Postgres (production). Empty → embedded PGlite in .data/ (local work).
+// The connection is reused across hot reloads.
+const g = globalThis as unknown as { __db?: Promise<DB> };
+
+async function connect(): Promise<DB> {
+  const url = process.env.DATABASE_URL;
+  if (url) {
+    const { neon } = await import('@neondatabase/serverless');
+    const { drizzle } = await import('drizzle-orm/neon-http');
+    return drizzle(neon(url), { schema }) as unknown as DB;
+  }
+  // never fall back to the throw-away local database on a real deployment
+  if (process.env.VERCEL) throw new Error('DATABASE_URL is not set. On Vercel, add the Neon Postgres integration (Storage tab) so it is filled in automatically.');
+  mkdirSync('./.data', { recursive: true });
+  const { PGlite } = await import('@electric-sql/pglite');
+  const { drizzle } = await import('drizzle-orm/pglite');
+  const client = new PGlite('./.data/pglite');
+  return drizzle(client, { schema }) as unknown as DB;
+}
+
+export const getDb = (): Promise<DB> => (g.__db ??= connect());
+export { schema };

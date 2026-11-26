@@ -1,0 +1,146 @@
+'use server';
+
+import { and, count, desc, eq } from 'drizzle-orm';
+import { getDb, schema } from '@/db';
+import type { TargetType } from '@/db/schema';
+import { AuthError, getSessionUser, requireUser } from '@/lib/session';
+
+const { likes, saves, comments, subscriptions, videos, posts, tools } = schema;
+
+export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+
+const isType = (v: unknown): v is TargetType => v === 'video' || v === 'post';
+
+// the target must exist and be published
+async function targetExists(type: TargetType, id: number): Promise<boolean> {
+  const db = await getDb();
+  const table = type === 'video' ? videos : posts;
+  const [row] = await db.select({ id: table.id }).from(table).where(and(eq(table.id, id), eq(table.published, true)));
+  return !!row;
+}
+
+function fail(e: unknown): { ok: false; error: string } {
+  if (e instanceof AuthError) return { ok: false, error: e.message };
+  console.error(e);
+  return { ok: false, error: 'server' };
+}
+
+/* ---------- like / save: pressing twice never doubles ---------- */
+
+async function toggle(table: typeof likes | typeof saves, type: unknown, id: unknown): Promise<Result<{ on: boolean; total: number }>> {
+  try {
+    if (!isType(type) || !Number.isInteger(id)) return { ok: false, error: 'bad-input' };
+    const user = await requireUser();
+    if (!(await targetExists(type, id as number))) return { ok: false, error: 'not-found' };
+    const db = await getDb();
+    const key = and(eq(table.userId, user.id), eq(table.targetType, type), eq(table.targetId, id as number));
+    const [existing] = await db.select().from(table).where(key);
+    if (existing) await db.delete(table).where(key);
+    else await db.insert(table).values({ userId: user.id, targetType: type, targetId: id as number }).onConflictDoNothing();
+    const [{ n }] = await db.select({ n: count() }).from(table).where(and(eq(table.targetType, type), eq(table.targetId, id as number)));
+    return { ok: true, on: !existing, total: n };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function toggleLike(type: unknown, id: unknown) {
+  return toggle(likes, type, id);
+}
+export async function toggleSave(type: unknown, id: unknown) {
+  return toggle(saves, type, id);
+}
+
+/* ---------- follow ---------- */
+
+export async function toggleFollow(scope: unknown): Promise<Result<{ on: boolean }>> {
+  try {
+    if (typeof scope !== 'string') return { ok: false, error: 'bad-input' };
+    const user = await requireUser();
+    const db = await getDb();
+    if (scope !== 'all') {
+      const m = scope.match(/^tool:(\d+)$/);
+      if (!m) return { ok: false, error: 'bad-input' };
+      const [tool] = await db.select({ id: tools.id }).from(tools).where(and(eq(tools.id, Number(m[1])), eq(tools.published, true)));
+      if (!tool) return { ok: false, error: 'not-found' };
+    }
+    const key = and(eq(subscriptions.userId, user.id), eq(subscriptions.scope, scope));
+    const [existing] = await db.select().from(subscriptions).where(key);
+    if (existing) await db.delete(subscriptions).where(key);
+    else await db.insert(subscriptions).values({ userId: user.id, scope }).onConflictDoNothing();
+    return { ok: true, on: !existing };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/* ---------- comments ---------- */
+
+const MAX_LEN = 2000;
+const COOLDOWN_MS = 20_000;
+
+export async function addComment(type: unknown, id: unknown, body: unknown, parentId?: unknown): Promise<Result> {
+  try {
+    if (!isType(type) || !Number.isInteger(id) || typeof body !== 'string') return { ok: false, error: 'bad-input' };
+    const user = await requireUser();
+    const text = body.trim();
+    if (!text) return { ok: false, error: 'empty' };
+    if (text.length > MAX_LEN) return { ok: false, error: 'too-long' };
+    if (!(await targetExists(type, id as number))) return { ok: false, error: 'not-found' };
+
+    const db = await getDb();
+    const [last] = await db.select({ at: comments.createdAt }).from(comments).where(eq(comments.userId, user.id)).orderBy(desc(comments.createdAt)).limit(1);
+    if (last && Date.now() - last.at.getTime() < COOLDOWN_MS) return { ok: false, error: 'too-fast' };
+
+    let parent: number | null = null;
+    if (parentId != null) {
+      if (!Number.isInteger(parentId)) return { ok: false, error: 'bad-input' };
+      const [p] = await db.select().from(comments).where(eq(comments.id, parentId as number));
+      // replies go one level deep, under a visible comment of the same item
+      if (!p || p.parentId !== null || p.hidden || p.targetType !== type || p.targetId !== id) return { ok: false, error: 'bad-input' };
+      parent = p.id;
+    }
+    await db.insert(comments).values({ userId: user.id, targetType: type, targetId: id as number, parentId: parent, body: text });
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function editComment(commentId: unknown, body: unknown): Promise<Result> {
+  try {
+    if (!Number.isInteger(commentId) || typeof body !== 'string') return { ok: false, error: 'bad-input' };
+    const user = await requireUser();
+    const text = body.trim();
+    if (!text) return { ok: false, error: 'empty' };
+    if (text.length > MAX_LEN) return { ok: false, error: 'too-long' };
+    const db = await getDb();
+    // the user id is part of the condition: nobody can edit someone else's comment
+    const rows = await db
+      .update(comments)
+      .set({ body: text, editedAt: new Date() })
+      .where(and(eq(comments.id, commentId as number), eq(comments.userId, user.id)))
+      .returning({ id: comments.id });
+    return rows.length ? { ok: true } : { ok: false, error: 'forbidden' };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export async function deleteComment(commentId: unknown): Promise<Result> {
+  try {
+    if (!Number.isInteger(commentId)) return { ok: false, error: 'bad-input' };
+    const session = await getSessionUser();
+    if (!session) return { ok: false, error: 'not-signed-in' };
+    const db = await getDb();
+    const where = session.isAdmin
+      ? eq(comments.id, commentId as number)
+      : and(eq(comments.id, commentId as number), eq(comments.userId, session.id));
+    const rows = await db.delete(comments).where(where).returning({ id: comments.id });
+    // replies hang off their parent, so they go with it
+    if (rows.length) await db.delete(comments).where(eq(comments.parentId, commentId as number));
+    return rows.length ? { ok: true } : { ok: false, error: 'forbidden' };
+  } catch (e) {
+    return fail(e);
+  }
+}

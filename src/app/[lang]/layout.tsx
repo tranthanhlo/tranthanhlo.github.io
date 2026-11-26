@@ -1,0 +1,62 @@
+import type { Metadata, Viewport } from 'next';
+import { notFound } from 'next/navigation';
+import '../globals.css';
+import { TopBar } from '@/components/TopBar';
+import { TabBar } from '@/components/TabBar';
+import { isLang, t } from '@/lib/i18n';
+import { SITE, SITE_URL } from '@/lib/site';
+import { getSessionUser } from '@/lib/session';
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fbf9f4' },
+    { media: '(prefers-color-scheme: dark)', color: '#0f0f0f' },
+  ],
+};
+
+export async function generateMetadata({ params }: { params: Promise<{ lang: string }> }): Promise<Metadata> {
+  const { lang } = await params;
+  if (!isLang(lang)) return {};
+  const ui = t(lang);
+  return {
+    metadataBase: new URL(SITE_URL),
+    title: { default: SITE.name, template: `%s · ${SITE.name}` },
+    description: ui.siteDescription,
+    applicationName: SITE.name,
+    icons: { icon: [{ url: '/favicon.svg', type: 'image/svg+xml' }] },
+    appleWebApp: { capable: true, title: SITE.short, statusBarStyle: 'black-translucent' },
+    openGraph: { siteName: SITE.name, type: 'website', locale: lang === 'vi' ? 'vi_VN' : 'en_US' },
+    alternates: { types: { 'application/rss+xml': lang === 'vi' ? '/rss.xml' : '/en/rss.xml' } },
+  };
+}
+
+// Picks the saved theme (or the phone's setting) before the first paint, so there is no flash
+const themeScript = `(()=>{try{var t=localStorage.getItem('theme');if(t!=='light'&&t!=='dark')t=matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';document.documentElement.dataset.theme=t;var c=t==='dark'?'#0f0f0f':'#fbf9f4';document.querySelectorAll('meta[name="theme-color"]').forEach(function(m){m.content=c})}catch(e){}})()`;
+
+export default async function LangLayout({ children, params }: { children: React.ReactNode; params: Promise<{ lang: string }> }) {
+  const { lang } = await params;
+  if (!isLang(lang)) notFound();
+  const ui = t(lang);
+  const me = await getSessionUser();
+
+  return (
+    <html lang={lang} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+      </head>
+      <body>
+        <a className="skip-link" href="#noi-dung">
+          {ui.skip}
+        </a>
+        <TopBar lang={lang} name={SITE.name} labels={{ search: ui.search, following: ui.youFollowing }} />
+        <TabBar lang={lang} name={SITE.name} avatar={me?.image} isAdmin={me?.isAdmin} labels={{ home: ui.tabHome, shorts: ui.tabShorts, create: ui.tabCreate, you: ui.tabYou }} />
+        <main id="noi-dung" tabIndex={-1} className="app-main outline-none">
+          {children}
+        </main>
+      </body>
+    </html>
+  );
+}

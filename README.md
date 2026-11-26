@@ -1,88 +1,104 @@
-# Blog của Trần Thanh Lộ
+# Trần Thanh Lộ: video, tool và bài viết
 
-Blog cá nhân dựng bằng [Astro](https://astro.build). Bài viết là các file Markdown.
+Trang giới thiệu các tool của mình, với giao diện kiểu app video trên điện thoại. Có video demo (đăng trên YouTube), bài viết, đăng nhập bằng Google cho người xem (thích, lưu, bình luận, theo dõi) và trang quản trị để tự đăng nội dung.
+
+**Công nghệ:** Next.js 15 (App Router) · TypeScript · Tailwind CSS 4 · Postgres (Neon) + Drizzle · Auth.js (Google) · Vercel Blob · Resend. Chạy trên Vercel.
 
 ## Chạy trên máy
 
 ```bash
 npm install
-npm run dev
+npm run db:migrate   # tạo cơ sở dữ liệu cục bộ trong .data/
+npm run db:seed      # nội dung mẫu (không bắt buộc)
+npm run dev          # http://localhost:4321
 ```
 
-Mở http://localhost:4321 để xem. Mỗi lần lưu file, trang tự cập nhật.
+Không cần tài khoản nào để chạy trên máy:
+- Cơ sở dữ liệu là PGlite (Postgres chạy ngay trong Node), lưu ở `.data/`.
+- Trong `.env.local` có `DEV_LOGIN=1`: khi đăng nhập sẽ có thêm hai nút **member** và **admin** để thử mà không cần Google. Nút này **không bao giờ** xuất hiện khi chạy production.
+- Ảnh tải lên từ trang admin được lưu ở `public/uploads/`.
 
-## Viết một bài mới
+Sao chép `.env.example` thành `.env.local` rồi điền (xem bảng bên dưới). Chỉ cần `AUTH_SECRET`, `ADMIN_EMAILS` và `DEV_LOGIN=1` là đủ để thử mọi thứ.
 
-1. Tạo file mới trong `src/content/blog/`. Tên file chính là đường dẫn của bài, nên viết không dấu, nối bằng gạch ngang. Ví dụ `mot-ngay-o-hoi-an.md` sẽ thành `/blog/mot-ngay-o-hoi-an`.
-2. Mở đầu file bằng phần thông tin (frontmatter):
+## Đưa lên mạng (Vercel)
 
-   ```md
-   ---
-   title: Một ngày ở Hội An
-   description: Một câu tóm tắt, hiện trong danh sách bài và khi chia sẻ link.
-   date: 2026-11-20
-   tags: [du lịch, ghi chép]
-   draft: true
-   ---
-   ```
+Làm một lần, theo thứ tự:
 
-   - `tags` không bắt buộc. Mỗi thẻ có một trang riêng tại `/the/<tên-thẻ>`.
-   - `draft: true` nghĩa là bài nháp: vẫn thấy khi chạy `npm run dev` nhưng không có trên web thật. Xóa dòng này khi muốn đăng.
-   - `updated: 2026-12-01` (tùy chọn) để ghi ngày sửa bài.
-3. Viết nội dung bên dưới bằng Markdown. Tiêu đề phụ dùng `##` và `###`. Bài có từ 3 tiêu đề phụ trở lên sẽ tự có mục lục.
+1. **Vercel**: vào vercel.com, đăng nhập bằng GitHub, **Add New → Project**, chọn repo này, bấm **Deploy**. Lần đầu sẽ báo lỗi thiếu `DATABASE_URL`, đó là bình thường, làm tiếp bước 2.
+2. **Cơ sở dữ liệu**: trong dự án Vercel, tab **Storage → Create → Neon (Postgres)**. Vercel tự điền `DATABASE_URL`. Bảng được tạo tự động mỗi lần build.
+3. **Kho ảnh**: tab **Storage → Create → Blob**. Vercel tự điền `BLOB_READ_WRITE_TOKEN`.
+4. **Đăng nhập Google**: vào [console.cloud.google.com](https://console.cloud.google.com), tạo dự án → **APIs & Services → OAuth consent screen** (loại External; điền tên app, email hỗ trợ, link quyền riêng tư là `https://<tên-miền>/quyen-rieng-tu`) → **Credentials → Create credentials → OAuth client ID** (loại Web application). Ở **Authorized redirect URIs** dán:
+   `https://<tên-miền>/api/auth/callback/google`
+   Lấy **Client ID** và **Client secret**.
+5. **Biến môi trường** (Vercel → Settings → Environment Variables):
 
-### Thêm ảnh
+   | Tên | Giá trị |
+   |---|---|
+   | `AUTH_SECRET` | một chuỗi ngẫu nhiên, tạo bằng `openssl rand -base64 32` |
+   | `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` | từ bước 4 |
+   | `ADMIN_EMAILS` | email Google của bạn (nhiều email thì cách nhau dấu phẩy). Chỉ những email này vào được `/admin` |
+   | `SITE_URL` | địa chỉ trang, ví dụ `https://tranthanhlo.vercel.app` (không có dấu `/` cuối) |
+   | `RESEND_API_KEY`, `EMAIL_FROM` | chỉ cần khi muốn gửi email thông báo (xem bên dưới) |
 
-Nếu bài có ảnh, nên tạo thư mục riêng cho bài:
+   Không đặt `DEV_LOGIN` trên Vercel.
+6. **Redeploy** (Deployments → ⋯ → Redeploy). Vào `/admin`, đăng nhập bằng Google, bắt đầu đăng nội dung.
 
-```
-src/content/blog/mot-ngay-o-hoi-an/
-  index.md
-  pho-co.jpg
-```
+Nội dung mẫu chỉ có ở máy bạn. Trang thật bắt đầu trống cho tới khi bạn thêm tool và video trong `/admin`.
 
-Trong bài, chèn ảnh bằng `![Phố cổ lúc chiều](./pho-co.jpg)`. Astro tự nén ảnh và tạo nhiều kích thước.
+### Email thông báo (Theo dõi)
 
-Muốn có ảnh bìa, thêm vào frontmatter:
+Khi có video hoặc tool mới, vào `/admin/notify` bấm **Gửi thông báo** (gửi bằng tay, mỗi mục một lần). Để gửi được cho người khác, [Resend](https://resend.com) bắt buộc bạn phải có **tên miền riêng đã xác minh**; khi chưa có, Resend chỉ gửi được về chính email của bạn. `EMAIL_FROM` có dạng `Trần Thanh Lộ <thongbao@ten-mien-cua-ban.com>`.
 
-```md
-cover: ./pho-co.jpg
-coverAlt: Phố cổ Hội An lúc chiều
-```
+## Thêm nội dung
 
-### Thêm bản tiếng Anh cho một bài
+Tất cả làm trong **`/admin`** (dùng được trên điện thoại):
 
-Blog có bản tiếng Anh ở `/en/`. Bên đó chỉ hiện những bài đã có bản dịch.
-
-1. Tạo file **cùng tên** với bài tiếng Việt trong `src/content/en/`. Ví dụ `src/content/blog/mot-ngay-o-hoi-an.md` thì bản dịch là `src/content/en/mot-ngay-o-hoi-an.md`.
-2. Frontmatter giống bài tiếng Việt, nhưng `title`, `description` và `tags` viết bằng tiếng Anh.
-3. Nút **EN / VI** trên đầu trang sẽ tự chuyển thẳng giữa hai bản của bài. Bài chưa dịch thì nút EN dẫn về danh sách bài tiếng Anh.
-
-Chữ trên giao diện (menu, nút, chân trang…) của cả hai thứ tiếng nằm trong `src/i18n.ts`.
+- **Video**: dán link YouTube, bấm *Lấy thông tin* để tự điền tiêu đề và ảnh, chọn tool, bấm Lưu. Để Unlisted trên YouTube nếu không muốn video lên kênh công khai.
+- **Tool**: tên, mô tả ngắn, icon, nền tảng, link tải/GitHub/hướng dẫn, thứ tự hiển thị.
+- **Bài viết**: viết bằng Markdown, có xem trước, chèn ảnh ngay trong khung soạn.
+- Mỗi mục có ô **tiếng Anh** tùy chọn. Để trống thì bản `/en/` dùng chữ tiếng Việt.
+- **Nháp**: bỏ tick *Đăng công khai* thì mục chỉ thấy trong admin.
+- **Bình luận**: ẩn, xóa, chặn người dùng ở `/admin/comments`.
 
 ## Cấu trúc
 
-| Đường dẫn | File |
+| Đường dẫn | Nội dung |
 |---|---|
-| `/` và `/en/` | `src/views/HomeView.astro` |
-| `/blog` và `/en/blog` | `src/views/BlogIndexView.astro` |
-| `/blog/<bài>` và `/en/blog/<bài>` | `src/layouts/PostLayout.astro` |
-| `/the/<thẻ>` và `/en/tags/<thẻ>` | `src/views/TagView.astro` |
-| `/ve-toi` và `/en/about` | `src/views/AboutView.astro` |
-| `/rss.xml` và `/en/rss.xml` | `src/rss.ts` |
+| `/`, `/en` | Trang chủ: chip lọc, danh sách video, kệ bài viết và video ngắn |
+| `/video/<slug>` | Trình phát, thích/lưu/chia sẻ, theo dõi tool, bình luận, video liên quan |
+| `/tool`, `/tool/<slug>` | Danh sách tool, trang của từng tool |
+| `/blog`, `/blog/<slug>` | Bài viết |
+| `/ve-toi`, `/tim-kiem`, `/ban`, `/quyen-rieng-tu` | Về tôi, tìm kiếm, tài khoản người xem, quyền riêng tư |
+| `/admin/*` | Quản trị (chỉ email trong `ADMIN_EMAILS`) |
+| `/rss.xml`, `/sitemap.xml`, `/robots.txt` | RSS, sitemap, robots |
 
-Các file trong `src/pages/` chỉ gọi tới những file trên, kèm ngôn ngữ. Màu sắc và kiểu chữ nằm trong `src/styles/global.css`. Tên blog và link LinkedIn nằm trong `src/site.ts`.
+Tiếng Việt nằm ở gốc (`/blog`), tiếng Anh dưới `/en` (`/en/blog`). Cả hai dùng chung một bộ trang trong `src/app/[lang]`; `src/middleware.ts` viết lại địa chỉ và chặn `/admin`.
 
-## Đưa lên mạng
+```
+src/app/[lang]/   trang công khai (cả hai ngôn ngữ)
+src/app/admin/    trang quản trị
+src/actions/      thao tác ghi (thích, bình luận, theo dõi, admin); mỗi thao tác tự kiểm tra quyền
+src/db/           bảng dữ liệu (schema.ts) và kết nối
+drizzle/          các file migration SQL
+src/lib/i18n.ts   chữ giao diện VI/EN
+src/lib/markdown.ts  Markdown → HTML an toàn, tô màu code
+scripts/          migrate.ts, seed.ts
+```
 
-Blog chạy trên GitHub Pages tại https://tranthanhlo.github.io. Mỗi lần đẩy code lên nhánh `main`, GitHub tự build và cập nhật web (xem `.github/workflows/deploy.yml`, tiến trình nằm ở tab Actions của repo).
+Đổi cấu trúc bảng: sửa `src/db/schema.ts`, chạy `npm run db:generate`, commit file mới trong `drizzle/`. Migration tự chạy ở mỗi lần build.
 
-Khi có tên miền riêng, sửa `site` trong `astro.config.mjs` để RSS và sitemap có đường dẫn đúng.
+## Bảo mật, ngắn gọn
 
-## Bản 3D cũ
+- Quyền admin chỉ dựa vào email trong biến môi trường, được kiểm tra ở middleware, ở layout `/admin` và **ở đầu mỗi thao tác ghi** (đừng bỏ dòng `requireAdmin()` khi thêm thao tác mới).
+- Thao tác của người xem (`src/actions/engage.ts`) luôn lọc theo `userId` của người đang đăng nhập, nên không ai sửa/xóa được bình luận của người khác.
+- Bình luận lưu và hiển thị dạng chữ thường (không HTML). Markdown của bài viết được lọc bằng `sanitize-html`.
+- Tải ảnh: chỉ admin, tối đa 5MB, kiểm tra loại ảnh bằng nội dung file chứ không tin tên file.
 
-Phòng trưng bày 3D các công trình Đà Nẵng vẫn còn trên nhánh `3d-gallery`:
+## Các phiên bản cũ
+
+Có hai nhánh lưu lại các phiên bản trước của trang này:
 
 ```bash
-git switch 3d-gallery
+git switch astro-blog    # blog Astro song ngữ (đã chạy tại tranthanhlo.github.io)
+git switch 3d-gallery    # phòng trưng bày 3D các công trình Đà Nẵng
 ```
