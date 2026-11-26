@@ -6,6 +6,8 @@ import { getDb, schema } from '@/db';
 import { escapeHtml, sendMails, type Mail } from '@/lib/email';
 import { renderMarkdown } from '@/lib/markdown';
 import { requireAdmin } from '@/lib/session';
+import { setBlockedWords } from '@/lib/rate-limit';
+import { contentChanged } from '@/lib/cache';
 import { SITE, SITE_URL } from '@/lib/site';
 import { slugify } from '@/lib/text';
 import { parseYoutubeId, youtubeThumb } from '@/lib/youtube';
@@ -104,6 +106,7 @@ export async function saveVideo(fd: FormData) {
   } else {
     await db.insert(videos).values({ ...values, slug: await uniqueSlug(videos, text(fd, 'slug') || title) });
   }
+  contentChanged();
   redirect('/admin/videos?saved=1');
 }
 
@@ -113,6 +116,7 @@ export async function deleteVideo(fd: FormData) {
   const db = await getDb();
   await removeEngagement('video', [id]);
   await db.delete(videos).where(eq(videos.id, id));
+  contentChanged();
   redirect('/admin/videos?deleted=1');
 }
 
@@ -144,6 +148,7 @@ export async function saveTool(fd: FormData) {
   };
   if (id) await db.update(tools).set({ ...values, slug: await uniqueSlug(tools, text(fd, 'slug') || name, id) }).where(eq(tools.id, id));
   else await db.insert(tools).values({ ...values, slug: await uniqueSlug(tools, text(fd, 'slug') || name) });
+  contentChanged();
   redirect('/admin/tools?saved=1');
 }
 
@@ -153,6 +158,7 @@ export async function deleteTool(fd: FormData) {
   const db = await getDb();
   await db.delete(subscriptions).where(eq(subscriptions.scope, `tool:${id}`));
   await db.delete(tools).where(eq(tools.id, id)); // its videos stay, with no tool
+  contentChanged();
   redirect('/admin/tools?deleted=1');
 }
 
@@ -182,6 +188,7 @@ export async function savePost(fd: FormData) {
   };
   if (id) await db.update(posts).set({ ...values, updatedAt: new Date(), slug: await uniqueSlug(posts, text(fd, 'slug') || title, id) }).where(eq(posts.id, id));
   else await db.insert(posts).values({ ...values, slug: await uniqueSlug(posts, text(fd, 'slug') || title) });
+  contentChanged();
   redirect('/admin/posts?saved=1');
 }
 
@@ -191,6 +198,7 @@ export async function deletePost(fd: FormData) {
   const db = await getDb();
   await removeEngagement('post', [id]);
   await db.delete(posts).where(eq(posts.id, id));
+  contentChanged();
   redirect('/admin/posts?deleted=1');
 }
 
@@ -302,4 +310,11 @@ export async function reorderTools(ids: unknown): Promise<void> {
   for (const [i, id] of (ids as number[]).entries()) {
     await db.update(tools).set({ sortOrder: i + 1 }).where(eq(tools.id, id));
   }
+  contentChanged();
+}
+
+export async function saveBlockedWords(fd: FormData) {
+  await requireAdmin();
+  await setBlockedWords(String(fd.get('words') ?? ''));
+  redirect('/admin/comments?words=1');
 }

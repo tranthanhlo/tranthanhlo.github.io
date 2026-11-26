@@ -7,10 +7,13 @@ import { AuthError, getSessionUser, requireUser } from '@/lib/session';
 import { getComments, type CommentSort } from '@/lib/queries';
 import { toCommentItems } from '@/lib/comments';
 import { isLang } from '@/lib/i18n';
+import { allow, containsBlocked, countLinks, getBlockedWords, MAX_LINKS } from '@/lib/rate-limit';
 
 const { likes, saves, comments, subscriptions, videos, posts, tools, users, commentLikes } = schema;
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
+
+const slowDown = { ok: false as const, error: 'rate-limited' };
 
 const isType = (v: unknown): v is TargetType => v === 'video' || v === 'post';
 
@@ -34,6 +37,7 @@ async function toggle(table: typeof likes | typeof saves, type: unknown, id: unk
   try {
     if (!isType(type) || !Number.isInteger(id)) return { ok: false, error: 'bad-input' };
     const user = await requireUser();
+    if (!(await allow(user.id, 'react'))) return slowDown;
     if (!(await targetExists(type, id as number))) return { ok: false, error: 'not-found' };
     const db = await getDb();
     const key = and(eq(table.userId, user.id), eq(table.targetType, type), eq(table.targetId, id as number));
@@ -60,6 +64,7 @@ export async function toggleFollow(scope: unknown): Promise<Result<{ on: boolean
   try {
     if (typeof scope !== 'string') return { ok: false, error: 'bad-input' };
     const user = await requireUser();
+    if (!(await allow(user.id, 'react'))) return slowDown;
     const db = await getDb();
     if (scope !== 'all') {
       const m = scope.match(/^tool:(\d+)$/);
@@ -82,13 +87,14 @@ export async function toggleFollow(scope: unknown): Promise<Result<{ on: boolean
 const MAX_LEN = 2000;
 const COOLDOWN_MS = 20_000;
 
-export async function addComment(type: unknown, id: unknown, body: unknown, parentId?: unknown): Promise<Result> {
+export async function addComment(type: unknown, id: unknown, body: unknown, parentId?: unknown): Promise<Result<{ held?: boolean }>> {
   try {
     if (!isType(type) || !Number.isInteger(id) || typeof body !== 'string') return { ok: false, error: 'bad-input' };
     const user = await requireUser();
     const text = body.trim();
     if (!text) return { ok: false, error: 'empty' };
     if (text.length > MAX_LEN) return { ok: false, error: 'too-long' };
+    if (countLinks(text) > MAX_LINKS) return { ok: false, error: 'too-many-links' };
     if (!(await targetExists(type, id as number))) return { ok: false, error: 'not-found' };
 
     const db = await getDb();
@@ -103,28 +109,33 @@ export async function addComment(type: unknown, id: unknown, body: unknown, pare
       if (!p || p.parentId !== null || p.hidden || p.targetType !== type || p.targetId !== id) return { ok: false, error: 'bad-input' };
       parent = p.id;
     }
-    await db.insert(comments).values({ userId: user.id, targetType: type, targetId: id as number, parentId: parent, body: text });
-    return { ok: true };
+    if (!(await allow(user.id, 'comment'))) return slowDown;
+    // a comment with a blocked word is kept but hidden until the admin looks at it
+    const held = containsBlocked(text, await getBlockedWords());
+    await db.insert(comments).values({ userId: user.id, targetType: type, targetId: id as number, parentId: parent, body: text, hidden: held });
+    return { ok: true, held };
   } catch (e) {
     return fail(e);
   }
 }
 
-export async function editComment(commentId: unknown, body: unknown): Promise<Result> {
+export async function editComment(commentId: unknown, body: unknown): Promise<Result<{ held?: boolean }>> {
   try {
     if (!Number.isInteger(commentId) || typeof body !== 'string') return { ok: false, error: 'bad-input' };
     const user = await requireUser();
     const text = body.trim();
     if (!text) return { ok: false, error: 'empty' };
     if (text.length > MAX_LEN) return { ok: false, error: 'too-long' };
+    if (countLinks(text) > MAX_LINKS) return { ok: false, error: 'too-many-links' };
+    const held = containsBlocked(text, await getBlockedWords());
     const db = await getDb();
     // the user id is part of the condition: nobody can edit someone else's comment
     const rows = await db
       .update(comments)
-      .set({ body: text, editedAt: new Date() })
+      .set({ body: text, editedAt: new Date(), ...(held ? { hidden: true } : {}) })
       .where(and(eq(comments.id, commentId as number), eq(comments.userId, user.id)))
       .returning({ id: comments.id });
-    return rows.length ? { ok: true } : { ok: false, error: 'forbidden' };
+    return rows.length ? { ok: true, held } : { ok: false, error: 'forbidden' };
   } catch (e) {
     return fail(e);
   }
@@ -187,6 +198,7 @@ export async function toggleCommentLike(commentId: unknown): Promise<Result<{ on
   try {
     if (!Number.isInteger(commentId)) return { ok: false, error: 'bad-input' };
     const user = await requireUser();
+    if (!(await allow(user.id, 'react'))) return slowDown;
     const db = await getDb();
     const [c] = await db.select({ id: comments.id }).from(comments).where(and(eq(comments.id, commentId as number), eq(comments.hidden, false)));
     if (!c) return { ok: false, error: 'not-found' };

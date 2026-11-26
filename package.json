@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "db:seed": "tsx scripts/seed.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "@auth/drizzle-adapter": "^1.11.3",
@@ -40,7 +41,8 @@
     "postcss": "^8.5.33",
     "tailwindcss": "^4.3.5",
     "tsx": "^4.23.15",
-    "typescript": "^6.0.3"
+    "typescript": "^6.0.3",
+    "vitest": "^5.1.2"
   },
   "overrides": {
     "@vercel/cli-config": {

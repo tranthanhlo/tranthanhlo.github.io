@@ -36,6 +36,9 @@ type Strings = SignInText & {
   errTooLong: string;
   errBanned: string;
   errGeneric: string;
+  errLinks: string;
+  errRate: string;
+  commentHeld: string;
   loadMoreComments: string;
   sortTop: string;
   sortNew: string;
@@ -131,7 +134,7 @@ export function Comments({ type, id, items, hasMore, total, lang, me, dev, s }: 
   const first = top[0];
 
   const message = (code: string) =>
-    ({ 'too-fast': s.errTooFast, empty: s.errEmpty, 'too-long': s.errTooLong, banned: s.errBanned })[code] ?? s.errGeneric;
+    ({ 'too-fast': s.errTooFast, empty: s.errEmpty, 'too-long': s.errTooLong, banned: s.errBanned, 'too-many-links': s.errLinks, 'rate-limited': s.errRate })[code] ?? s.errGeneric;
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,6 +146,7 @@ export function Comments({ type, id, items, hasMore, total, lang, me, dev, s }: 
         setText('');
         setReplyTo(null);
         setEditing(null);
+        if (r.held) setError(s.commentHeld);
         router.refresh();
       } else setError(message(r.error));
     });

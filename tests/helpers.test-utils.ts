@@ -1,0 +1,14 @@
+// A fresh database in memory with all migrations applied, for one test file
+import { PGlite } from '@electric-sql/pglite';
+import { drizzle } from 'drizzle-orm/pglite';
+import { migrate } from 'drizzle-orm/pglite/migrator';
+import * as schema from '@/db/schema';
+
+export async function memoryDb() {
+  const client = new PGlite();
+  const db = drizzle(client, { schema });
+  await migrate(db, { migrationsFolder: 'drizzle' });
+  return db;
+}
+
+export type TestDb = Awaited<ReturnType<typeof memoryDb>>;

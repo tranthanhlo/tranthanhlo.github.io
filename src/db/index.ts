@@ -17,10 +17,11 @@ async function connect(): Promise<DB> {
   }
   // never fall back to the throw-away local database on a real deployment
   if (process.env.VERCEL) throw new Error('DATABASE_URL is not set. On Vercel, add the Neon Postgres integration (Storage tab) so it is filled in automatically.');
-  mkdirSync('./.data', { recursive: true });
+  const dir = process.env.PGLITE_DIR || './.data/pglite';
+  mkdirSync(dir, { recursive: true });
   const { PGlite } = await import('@electric-sql/pglite');
   const { drizzle } = await import('drizzle-orm/pglite');
-  const client = new PGlite('./.data/pglite');
+  const client = new PGlite(dir);
   return drizzle(client, { schema }) as unknown as DB;
 }
 

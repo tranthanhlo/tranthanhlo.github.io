@@ -1,6 +1,7 @@
 import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import type { TargetType } from '@/db/schema';
+import { cached } from '@/lib/cache';
 
 const { tools, videos, posts, comments, likes, saves, subscriptions, users, commentLikes } = schema;
 
@@ -15,12 +16,12 @@ interface Opts {
 
 /* ---------- tools ---------- */
 
-export async function getTools({ drafts = false }: Opts = {}): Promise<Tool[]> {
+async function loadTools({ drafts = false }: Opts = {}): Promise<Tool[]> {
   const db = await getDb();
   return db.select().from(tools).where(drafts ? undefined : eq(tools.published, true)).orderBy(asc(tools.sortOrder), asc(tools.name));
 }
 
-export async function getToolBySlug(slug: string, { drafts = false }: Opts = {}): Promise<Tool | null> {
+async function loadToolBySlug(slug: string, { drafts = false }: Opts = {}): Promise<Tool | null> {
   const db = await getDb();
   const [row] = await db.select().from(tools).where(and(eq(tools.slug, slug), drafts ? undefined : eq(tools.published, true)));
   return row ?? null;
@@ -46,7 +47,7 @@ interface VideoFilter extends Opts {
   limit?: number;
 }
 
-export async function getVideos(f: VideoFilter = {}): Promise<VideoWithTool[]> {
+async function loadVideos(f: VideoFilter = {}): Promise<VideoWithTool[]> {
   const db = await getDb();
   const where = and(
     f.drafts ? undefined : eq(videos.published, true),
@@ -59,7 +60,7 @@ export async function getVideos(f: VideoFilter = {}): Promise<VideoWithTool[]> {
   return rows.map((r) => ({ ...r.video, tool: r.tool && r.tool.id != null ? r.tool : null }));
 }
 
-export async function getVideoBySlug(slug: string, { drafts = false }: Opts = {}): Promise<VideoWithTool | null> {
+async function loadVideoBySlug(slug: string, { drafts = false }: Opts = {}): Promise<VideoWithTool | null> {
   const db = await getDb();
   const [r] = await db
     .select(videoWithTool)
@@ -86,14 +87,14 @@ export async function getRelatedVideos(video: VideoWithTool, limit = 8): Promise
 
 /* ---------- posts ---------- */
 
-export async function getPosts({ drafts = false, limit, tag }: Opts & { limit?: number; tag?: string } = {}): Promise<Post[]> {
+async function loadPosts({ drafts = false, limit, tag }: Opts & { limit?: number; tag?: string } = {}): Promise<Post[]> {
   const db = await getDb();
   const where = and(drafts ? undefined : eq(posts.published, true), tag ? sql`${tag} = ANY(${posts.tags})` : undefined);
   const q = db.select().from(posts).where(where).orderBy(desc(posts.publishedAt));
   return limit ? q.limit(limit) : q;
 }
 
-export async function getPostBySlug(slug: string, { drafts = false }: Opts = {}): Promise<Post | null> {
+async function loadPostBySlug(slug: string, { drafts = false }: Opts = {}): Promise<Post | null> {
   const db = await getDb();
   const [row] = await db.select().from(posts).where(and(eq(posts.slug, slug), drafts ? undefined : eq(posts.published, true)));
   return row ?? null;
@@ -346,3 +347,19 @@ export async function getNotifications(userId: string, limit = 30): Promise<{ it
     .slice(0, limit);
   return { items, unread: items.filter((i) => i.isNew).length };
 }
+
+/* ---------- cached public readers (drafts are never cached) ---------- */
+
+const cTools = cached(loadTools, 'tools');
+const cToolBySlug = cached(loadToolBySlug, 'tool');
+const cVideos = cached(loadVideos, 'videos');
+const cVideoBySlug = cached(loadVideoBySlug, 'video');
+const cPosts = cached(loadPosts, 'posts');
+const cPostBySlug = cached(loadPostBySlug, 'post');
+
+export const getTools = (o: Opts = {}) => (o.drafts ? loadTools(o) : cTools(o));
+export const getToolBySlug = (slug: string, o: Opts = {}) => (o.drafts ? loadToolBySlug(slug, o) : cToolBySlug(slug, o));
+export const getVideos = (f: VideoFilter = {}) => (f.drafts ? loadVideos(f) : cVideos(f));
+export const getVideoBySlug = (slug: string, o: Opts = {}) => (o.drafts ? loadVideoBySlug(slug, o) : cVideoBySlug(slug, o));
+export const getPosts = (o: Opts & { limit?: number; tag?: string } = {}) => (o.drafts ? loadPosts(o) : cPosts(o));
+export const getPostBySlug = (slug: string, o: Opts = {}) => (o.drafts ? loadPostBySlug(slug, o) : cPostBySlug(slug, o));

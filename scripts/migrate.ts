@@ -12,10 +12,11 @@ async function main() {
     console.log('Migrated Neon database');
   } else {
     if (process.env.VERCEL) throw new Error('DATABASE_URL is not set. On Vercel, add the Neon Postgres integration (Storage tab) so it is filled in automatically.');
-    mkdirSync('./.data', { recursive: true });
+    const dir = process.env.PGLITE_DIR || './.data/pglite';
+    mkdirSync(dir, { recursive: true });
     const { PGlite } = await import('@electric-sql/pglite');
     const { drizzle } = await import('drizzle-orm/pglite');
-    const client = new PGlite('./.data/pglite');
+    const client = new PGlite(dir);
     await migratePglite(drizzle(client), { migrationsFolder: './drizzle' });
     await client.close();
     console.log('Migrated local PGlite database (.data/pglite)');

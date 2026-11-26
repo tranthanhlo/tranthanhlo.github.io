@@ -153,6 +153,9 @@ const ui = {
     errTooLong: 'Bình luận quá dài (tối đa 2.000 ký tự).',
     errBanned: 'Tài khoản này không thể bình luận.',
     errGeneric: 'Có lỗi xảy ra. Vui lòng thử lại.',
+    errLinks: 'Bình luận có quá nhiều link (tối đa 2).',
+    errRate: 'Bạn thao tác quá nhanh. Nghỉ một chút rồi thử lại nhé.',
+    commentHeld: 'Bình luận của bạn đang chờ duyệt.',
   },
   en: {
     siteName: 'Trần Thanh Lộ',
@@ -286,6 +289,9 @@ const ui = {
     errTooLong: 'The comment is too long (2,000 characters max).',
     errBanned: 'This account cannot comment.',
     errGeneric: 'Something went wrong. Please try again.',
+    errLinks: 'Too many links in the comment (2 max).',
+    errRate: 'You are going too fast. Take a short break and try again.',
+    commentHeld: 'Your comment is waiting for review.',
   },
 } as const;
 

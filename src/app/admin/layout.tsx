@@ -17,6 +17,7 @@ const nav = [
   { href: '/admin/posts', label: 'Bài viết' },
   { href: '/admin/comments', label: 'Bình luận' },
   { href: '/admin/notify', label: 'Thông báo' },
+  { href: '/admin/backup', label: 'Sao lưu' },
 ];
 
 // The middleware already turns visitors away; this checks again on the server.

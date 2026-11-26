@@ -145,7 +145,7 @@ export default async function VideoPage({ params }: Props) {
             hasMore={comments.hasMore}
             total={engagement.comments}
             lang={lang}
-            s={{ ...signIn, ...strings(lang, 'comments', 'noComments', 'commentPlaceholder', 'send', 'reply', 'edit', 'delete', 'cancel', 'errTooFast', 'errEmpty', 'errTooLong', 'errBanned', 'errGeneric', 'loadMoreComments', 'sortTop', 'sortNew', 'like', 'liked') }}
+            s={{ ...signIn, ...strings(lang, 'comments', 'noComments', 'commentPlaceholder', 'send', 'reply', 'edit', 'delete', 'cancel', 'errTooFast', 'errEmpty', 'errTooLong', 'errBanned', 'errGeneric', 'loadMoreComments', 'sortTop', 'sortNew', 'like', 'liked', 'errLinks', 'errRate', 'commentHeld') }}
           />
         </div>
       </div>

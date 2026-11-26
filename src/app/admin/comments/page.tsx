@@ -1,9 +1,10 @@
 import Link from 'next/link';
 import { desc, eq, inArray } from 'drizzle-orm';
-import { setCommentHidden, setUserBanned } from '@/actions/admin';
+import { saveBlockedWords, setCommentHidden, setUserBanned } from '@/actions/admin';
 import { deleteComment } from '@/actions/engage';
 import { ConfirmButton } from '@/components/ConfirmButton';
-import { btnDanger, PageHead } from '@/components/admin/ui';
+import { btnDanger, btnGhost, inputClass, Notice, PageHead } from '@/components/admin/ui';
+import { getBlockedWords } from '@/lib/rate-limit';
 import { getDb, schema } from '@/db';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,9 @@ async function removeComment(fd: FormData) {
   redirect('/admin/comments');
 }
 
-export default async function AdminComments() {
+export default async function AdminComments({ searchParams }: { searchParams: Promise<{ words?: string }> }) {
+  const sp = await searchParams;
+  const words = await getBlockedWords();
   const db = await getDb();
   const { comments, users, videos, posts } = schema;
   const rows = await db
@@ -53,6 +56,19 @@ export default async function AdminComments() {
   return (
     <>
       <PageHead title="Bình luận" />
+      {sp.words && <Notice>Đã lưu danh sách từ cấm.</Notice>}
+      <details className="mb-6 rounded-2xl border border-line p-4">
+        <summary className="cursor-pointer font-semibold">Từ cấm ({words.length})</summary>
+        <form action={saveBlockedWords} className="mt-3 grid gap-3">
+          <p className="text-sm text-faint">
+            Mỗi dòng một từ hoặc cụm từ. Bình luận chứa từ cấm (không phân biệt dấu, hoa thường) sẽ tự ẩn và hiện ở danh sách dưới với nhãn ĐÃ ẨN để bạn duyệt.
+          </p>
+          <textarea name="words" defaultValue={words.join('\n')} rows={6} aria-label="Danh sách từ cấm" className={`${inputClass} py-2`} />
+          <button type="submit" className={`${btnGhost} justify-self-start`}>
+            Lưu từ cấm
+          </button>
+        </form>
+      </details>
       {rows.length === 0 && <p className="text-soft">Chưa có bình luận nào.</p>}
       <ul className="grid gap-4">
         {rows.map((c) => {

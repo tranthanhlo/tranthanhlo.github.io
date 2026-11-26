@@ -11,6 +11,7 @@ npm install
 npm run db:migrate   # tạo cơ sở dữ liệu cục bộ trong .data/
 npm run db:seed      # nội dung mẫu (không bắt buộc)
 npm run dev          # http://localhost:4321
+npm test             # kiểm thử tự động (chạy trên cơ sở dữ liệu trong bộ nhớ)
 ```
 
 Không cần tài khoản nào để chạy trên máy:
@@ -58,7 +59,9 @@ Tất cả làm trong **`/admin`** (dùng được trên điện thoại):
 - **Bài viết**: viết bằng Markdown, có xem trước, chèn ảnh ngay trong khung soạn.
 - Mỗi mục có ô **tiếng Anh** tùy chọn. Để trống thì bản `/en/` dùng chữ tiếng Việt.
 - **Nháp**: bỏ tick *Đăng công khai* thì mục chỉ thấy trong admin.
-- **Bình luận**: ẩn, xóa, chặn người dùng ở `/admin/comments`.
+- **Bình luận**: ẩn, xóa, chặn người dùng ở `/admin/comments`. Ở đó cũng có ô **Từ cấm**: bình luận chứa từ cấm sẽ tự ẩn chờ bạn duyệt.
+- **Tool**: kéo biểu tượng ⠿ (hoặc bấm ↑ ↓) để đổi thứ tự rồi bấm *Lưu thứ tự*.
+- **Sao lưu**: `/admin/backup`, xem mục “Sao lưu và khôi phục” bên dưới.
 
 ## Cấu trúc
 
@@ -69,6 +72,7 @@ Tất cả làm trong **`/admin`** (dùng được trên điện thoại):
 | `/tool`, `/tool/<slug>` | Danh sách tool, trang của từng tool |
 | `/blog`, `/blog/<slug>` | Bài viết |
 | `/ve-toi`, `/tim-kiem`, `/ban`, `/quyen-rieng-tu` | Về tôi, tìm kiếm, tài khoản người xem, quyền riêng tư |
+| `/thong-bao` | Thông báo video và tool mới của mục bạn theo dõi (chuông) |
 | `/admin/*` | Quản trị (chỉ email trong `ADMIN_EMAILS`) |
 | `/rss.xml`, `/sitemap.xml`, `/robots.txt` | RSS, sitemap, robots |
 
@@ -86,6 +90,31 @@ scripts/          migrate.ts, seed.ts
 ```
 
 Đổi cấu trúc bảng: sửa `src/db/schema.ts`, chạy `npm run db:generate`, commit file mới trong `drizzle/`. Migration tự chạy ở mỗi lần build.
+
+## Sao lưu và khôi phục
+
+- **Tải bản sao lưu**: vào `/admin/backup` bấm *Tải bản sao lưu*, nên làm mỗi tháng một lần. File JSON có email thành viên nên cất riêng tư, **không** đưa lên GitHub. File không chứa mã đăng nhập Google. Ảnh tải lên nằm ở Vercel Blob, không nằm trong file.
+- **Khôi phục vào cơ sở dữ liệu trống** (ví dụ tạo lại Neon):
+  ```bash
+  DATABASE_URL="<chuỗi kết nối mới>" npm run db:migrate
+  DATABASE_URL="<chuỗi kết nối mới>" npx tsx scripts/restore.ts duong-dan/backup.json
+  ```
+  Script từ chối chạy nếu cơ sở dữ liệu đã có người dùng.
+- **Neon cũng giữ lịch sử**: ở gói miễn phí có thể quay lại trạng thái vài giờ hoặc vài ngày trước ngay trong bảng điều khiển Neon (mục *Restore*). Đó là lưới an toàn thứ hai, ngắn hạn.
+
+## Kiểm thử
+
+`npm test` chạy Vitest: các hàm thuần (đọc link YouTube, lọc Markdown, chữ không dấu…) và các thao tác ghi (thích, bình luận, theo dõi, chuông, admin) trên một Postgres thật trong bộ nhớ (PGlite) với người dùng giả lập. Có các trường hợp: khách, thành viên, người bị chặn, admin, sửa/xóa bình luận của người khác, giới hạn tần suất. GitHub Actions (`.github/workflows/ci.yml`) chạy lint, kiểm tra kiểu, test và build mỗi lần đẩy code.
+
+## Chống spam
+
+- Mỗi người: tối đa 60 lượt thích/lưu/theo dõi mỗi phút, 10 bình luận mỗi 10 phút, cách nhau ít nhất 20 giây, tối đa 2 link trong một bình luận.
+- Bình luận chứa từ cấm tự ẩn chờ duyệt.
+- Giới hạn được lưu trong cơ sở dữ liệu (bảng `rate_events`) nên chạy đúng trên Vercel.
+
+## Tốc độ
+
+Danh sách và trang chi tiết công khai (video, tool, bài) được lưu tạm tối đa 60 giây (`src/lib/cache.ts`). Mọi thay đổi trong `/admin` xóa bộ nhớ đệm ngay nên không phải đợi. Phần riêng của từng người (đã thích, đã lưu, chuông) luôn lấy mới. Khi thêm thao tác ghi mới cho nội dung công khai, gọi `contentChanged()`.
 
 ## Bảo mật, ngắn gọn
 
