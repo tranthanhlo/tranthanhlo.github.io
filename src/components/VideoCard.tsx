@@ -26,21 +26,20 @@ export function VideoCard({ video, lang, compact = false, engage, now = Date.now
     return (
       <Link href={path} className="press flex gap-3">
         <div className="relative w-40 shrink-0 overflow-hidden rounded-xl">
-          <Thumb youtubeId={video.youtubeId} thumbnailUrl={video.thumbnailUrl} title={title} toolName={toolName} lang={lang} />
+          <Thumb youtubeId={video.youtubeId} thumbnailUrl={video.thumbnailUrl} title={title} toolName={toolName} lang={lang} small />
           {video.duration && <Duration text={video.duration} />}
         </div>
         <div className="min-w-0">
           <h3 className="line-clamp-2 text-sm font-medium leading-snug">{title}</h3>
           <p className="mt-1 text-xs text-faint">
             {toolName ? `${toolName} · ` : ''}
-            {timeAgo(video.publishedAt, lang, now)}
+            {ui.viewsCount(video.views)} · {timeAgo(video.publishedAt, lang, now)}
           </p>
         </div>
       </Link>
     );
   }
 
-  const likes = engage?.stat.likes ?? 0;
   return (
     <article className="overflow-hidden rounded-[20px] bg-card">
       <FeedMedia href={path} youtubeId={video.youtubeId} title={title} labels={{ mute: ui.mute, unmute: ui.unmute }}>
@@ -65,8 +64,7 @@ export function VideoCard({ video, lang, compact = false, engage, now = Date.now
           <div className="min-w-[5.5rem] flex-1 text-[13px] leading-snug text-faint">
             <p className="truncate font-medium text-soft">{toolName ?? ' '}</p>
             <p className="truncate">
-              {likes > 0 && `${ui.likesCount(likes)} · `}
-              {timeAgo(video.publishedAt, lang, now)}
+              {ui.viewsCount(video.views)} · {timeAgo(video.publishedAt, lang, now)}
             </p>
           </div>
           {engage && (

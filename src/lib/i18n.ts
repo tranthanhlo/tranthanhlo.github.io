@@ -15,6 +15,11 @@ export function pick<T extends string | null | undefined>(lang: Lang, vi: string
   return lang === 'en' && en ? en : vi;
 }
 
+// 1234 → "1,2 N" / "1.2K", like the app
+function compact(n: number, locale: string): string {
+  return new Intl.NumberFormat(locale, { notation: 'compact', maximumFractionDigits: 1 }).format(n);
+}
+
 const ui = {
   vi: {
     siteName: 'Trần Thanh Lộ',
@@ -104,6 +109,15 @@ const ui = {
     searchTitle: 'Tìm kiếm',
     searchPlaceholder: 'Tìm video, tool, bài viết…',
     searchEmpty: 'Không tìm thấy kết quả nào.',
+    searchRecent: 'Tìm gần đây',
+    notifTitle: 'Thông báo',
+    notifEmpty: 'Chưa có thông báo nào. Theo dõi một tool hoặc cả kênh để được báo khi có video mới.',
+    notifVideo: (tool: string) => `${tool} đã đăng video mới`,
+    notifTool: 'Tool mới',
+    notifUnread: (n: number) => `Thông báo, ${n} mới`,
+    searchClear: 'Xóa',
+    filterVideos: 'Video',
+    viewsWord: 'lượt xem',
     youTitle: 'Bạn',
     youSaved: 'Đã lưu',
     youLiked: 'Đã thích',
@@ -123,6 +137,7 @@ const ui = {
     ago: (v: string) => `${v} trước`,
     units: { m: 'phút', h: 'giờ', d: 'ngày', w: 'tuần', mo: 'tháng', y: 'năm' },
     likesCount: (n: number) => `${n} thích`,
+    viewsCount: (n: number) => `${compact(n, 'vi-VN')} lượt xem`,
     commentsCount: (n: number) => `${n} bình luận`,
     errTooFast: 'Bạn gửi hơi nhanh. Chờ vài giây rồi thử lại.',
     errEmpty: 'Bình luận đang trống.',
@@ -218,6 +233,15 @@ const ui = {
     searchTitle: 'Search',
     searchPlaceholder: 'Search videos, tools, posts…',
     searchEmpty: 'Nothing found.',
+    searchRecent: 'Recent searches',
+    notifTitle: 'Notifications',
+    notifEmpty: 'No notifications yet. Follow a tool or the whole channel to hear about new videos.',
+    notifVideo: (tool: string) => `${tool} posted a new video`,
+    notifTool: 'New tool',
+    notifUnread: (n: number) => `Notifications, ${n} new`,
+    searchClear: 'Clear',
+    filterVideos: 'Videos',
+    viewsWord: 'views',
     youTitle: 'You',
     youSaved: 'Saved',
     youLiked: 'Liked',
@@ -237,6 +261,7 @@ const ui = {
     ago: (v: string) => `${v} ago`,
     units: { m: 'min', h: 'h', d: 'd', w: 'w', mo: 'mo', y: 'y' },
     likesCount: (n: number) => `${n} ${n === 1 ? 'like' : 'likes'}`,
+    viewsCount: (n: number) => `${compact(n, 'en-US')} ${n === 1 ? 'view' : 'views'}`,
     commentsCount: (n: number) => `${n} ${n === 1 ? 'comment' : 'comments'}`,
     errTooFast: 'You are posting too fast. Wait a few seconds and try again.',
     errEmpty: 'The comment is empty.',

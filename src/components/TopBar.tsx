@@ -10,12 +10,15 @@ import { href, type Lang } from '@/lib/i18n';
 interface Props {
   lang: Lang;
   name: string;
-  labels: { search: string; following: string };
+  labels: { search: string; bell: string };
+  // how many new videos/tools the signed-in person has not seen yet
+  badge?: number;
+  signedIn?: boolean;
 }
 
 // Like the phone app: logo on the left, bell and search on the right. It hides while you scroll down
 // and comes back when you scroll up, and the filter row under it follows (through --bar-top).
-export function TopBar({ lang, name, labels }: Props) {
+export function TopBar({ lang, name, labels, badge = 0, signedIn = false }: Props) {
   const pathname = usePathname();
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
@@ -57,8 +60,17 @@ export function TopBar({ lang, name, labels }: Props) {
           <span className="text-xl font-semibold tracking-tight">{name}</span>
         </Link>
         <div className="ml-auto flex items-center">
-          <Link href={href(lang, '/ban')} aria-label={labels.following} className={round}>
+          <Link
+            href={signedIn ? href(lang, '/thong-bao') : `/dang-nhap?next=${encodeURIComponent(href(lang, '/thong-bao'))}`}
+            aria-label={labels.bell}
+            className={`${round} relative`}
+          >
             <Icon name="bell" size={25} />
+            {badge > 0 && (
+              <span aria-hidden="true" className="absolute right-0.5 top-1 min-w-5 rounded-full bg-red-600 px-1.5 text-center text-[11px] font-bold leading-5 text-white">
+                {badge > 9 ? '9+' : badge}
+              </span>
+            )}
           </Link>
           <Link href={href(lang, '/tim-kiem')} aria-label={labels.search} className={round}>
             <Icon name="search" size={25} />

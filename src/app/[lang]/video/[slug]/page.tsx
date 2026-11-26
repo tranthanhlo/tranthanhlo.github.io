@@ -7,6 +7,7 @@ import { Expandable } from '@/components/Expandable';
 import { LitePlayer } from '@/components/LitePlayer';
 import { SubscribeButton } from '@/components/SubscribeButton';
 import { ToolIcon } from '@/components/ToolIcon';
+import { ViewPing } from '@/components/ViewPing';
 import { VideoCard } from '@/components/VideoCard';
 import { devLoginEnabled } from '@/lib/admin';
 import { href, isLang, pick, strings, t, timeAgo } from '@/lib/i18n';
@@ -80,6 +81,7 @@ export default async function VideoPage({ params }: Props) {
   return (
     <div className="page lg:flex lg:gap-6 lg:px-6 lg:pt-4">
       {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld).replace(/</g, '\\u003c') }} />}
+      <ViewPing type="video" id={video.id} />
       <div className="min-w-0 flex-1">
         {/* the player stays at the top while the page scrolls */}
         <div className={`bg-black max-lg:pt-[env(safe-area-inset-top)] lg:static lg:overflow-hidden lg:rounded-xl ${video.vertical ? '' : 'sticky top-0 z-30'}`}>
@@ -97,8 +99,7 @@ export default async function VideoPage({ params }: Props) {
           <div>
             <h1 className="text-[17px] font-semibold leading-snug">{title}</h1>
             <p className="mt-1 text-[13px] text-faint">
-              {engagement.likes > 0 && `${ui.likesCount(engagement.likes)} · `}
-              {timeAgo(video.publishedAt, lang, now)}
+              {ui.viewsCount(video.views)} · {timeAgo(video.publishedAt, lang, now)}
               {video.isSample && <span className="ml-2 font-semibold uppercase text-soft">{ui.sample}</span>}
             </p>
           </div>

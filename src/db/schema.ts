@@ -49,6 +49,7 @@ export const videos = pgTable('videos', {
   publishedAt: timestamp('published_at', { withTimezone: true }).notNull().defaultNow(),
   published: boolean('published').notNull().default(false),
   isSample: boolean('is_sample').notNull().default(false),
+  views: integer('views').notNull().default(0),
 });
 
 export const posts = pgTable('posts', {
@@ -66,6 +67,7 @@ export const posts = pgTable('posts', {
   updatedAt: timestamp('updated_at', { withTimezone: true }),
   published: boolean('published').notNull().default(false),
   isSample: boolean('is_sample').notNull().default(false),
+  views: integer('views').notNull().default(0),
 });
 
 /* ---------- people (Auth.js tables) ---------- */
@@ -78,6 +80,8 @@ export const users = pgTable('users', {
   image: text('image'),
   role: text('role', { enum: ['admin', 'member'] }).notNull().default('member'),
   banned: boolean('banned').notNull().default(false),
+  // when this person last opened the notifications page (the bell counts what came after)
+  notificationsSeenAt: timestamp('notifications_seen_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
@@ -184,4 +188,33 @@ export const notificationsSent = pgTable(
     sentAt: timestamp('sent_at', { withTimezone: true }).notNull().defaultNow(),
   },
   (t) => [uniqueIndex('notifications_sent_target_idx').on(t.kind, t.targetId)],
+);
+
+// one like per person per comment
+export const commentLikes = pgTable(
+  'comment_likes',
+  {
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    commentId: integer('comment_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [primaryKey({ columns: [t.userId, t.commentId] }), index('comment_likes_comment_idx').on(t.commentId)],
+);
+
+// small key/value settings the admin can change (e.g. the blocked-words list)
+export const settings = pgTable('settings', {
+  key: text('key').primaryKey(),
+  value: text('value').notNull().default(''),
+});
+
+// recent actions per person, used to slow down spam (old rows are cleaned up as new ones arrive)
+export const rateEvents = pgTable(
+  'rate_events',
+  {
+    id: serial('id').primaryKey(),
+    userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+    kind: text('kind').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('rate_events_user_kind_idx').on(t.userId, t.kind, t.createdAt)],
 );

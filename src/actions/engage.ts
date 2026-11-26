@@ -1,11 +1,11 @@
 'use server';
 
-import { and, count, desc, eq } from 'drizzle-orm';
+import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import type { TargetType } from '@/db/schema';
 import { AuthError, getSessionUser, requireUser } from '@/lib/session';
 
-const { likes, saves, comments, subscriptions, videos, posts, tools } = schema;
+const { likes, saves, comments, subscriptions, videos, posts, tools, users } = schema;
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -142,5 +142,29 @@ export async function deleteComment(commentId: unknown): Promise<Result> {
     return rows.length ? { ok: true } : { ok: false, error: 'forbidden' };
   } catch (e) {
     return fail(e);
+  }
+}
+
+/* ---------- views ---------- */
+
+// Counts one view. No login and nothing about the person is stored; the browser asks at most once an hour per item.
+export async function addView(type: unknown, id: unknown): Promise<void> {
+  if (!isType(type) || !Number.isInteger(id)) return;
+  const db = await getDb();
+  const table = type === 'video' ? videos : posts;
+  await db
+    .update(table)
+    .set({ views: sql`${table.views} + 1` })
+    .where(and(eq(table.id, id as number), eq(table.published, true)));
+}
+
+// The bell is cleared once the notifications page has been opened
+export async function markNotificationsSeen(): Promise<void> {
+  try {
+    const user = await requireUser();
+    const db = await getDb();
+    await db.update(users).set({ notificationsSeenAt: new Date() }).where(eq(users.id, user.id));
+  } catch {
+    // signed out: nothing to remember
   }
 }

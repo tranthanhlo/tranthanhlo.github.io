@@ -6,6 +6,7 @@ import { TabBar } from '@/components/TabBar';
 import { isLang, t } from '@/lib/i18n';
 import { SITE, SITE_URL } from '@/lib/site';
 import { getSessionUser } from '@/lib/session';
+import { getNotifications } from '@/lib/queries';
 
 export const viewport: Viewport = {
   width: 'device-width',
@@ -41,6 +42,7 @@ export default async function LangLayout({ children, params }: { children: React
   if (!isLang(lang)) notFound();
   const ui = t(lang);
   const me = await getSessionUser();
+  const unread = me ? (await getNotifications(me.id)).unread : 0;
 
   return (
     <html lang={lang} suppressHydrationWarning>
@@ -51,7 +53,7 @@ export default async function LangLayout({ children, params }: { children: React
         <a className="skip-link" href="#noi-dung">
           {ui.skip}
         </a>
-        <TopBar lang={lang} name={SITE.name} labels={{ search: ui.search, following: ui.youFollowing }} />
+        <TopBar lang={lang} name={SITE.name} signedIn={!!me} badge={unread} labels={{ search: ui.search, bell: unread ? ui.notifUnread(unread) : ui.notifTitle }} />
         <TabBar lang={lang} name={SITE.name} avatar={me?.image} isAdmin={me?.isAdmin} labels={{ home: ui.tabHome, shorts: ui.tabShorts, create: ui.tabCreate, you: ui.tabYou }} />
         <main id="noi-dung" tabIndex={-1} className="app-main outline-none">
           {children}

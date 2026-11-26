@@ -11,8 +11,21 @@ export default async function SearchPage({ params }: { params: Promise<{ lang: s
   const ui = t(lang);
   return (
     <div className="pad page max-w-2xl py-5">
-      <h1 className="mb-4 text-2xl font-semibold">{ui.searchTitle}</h1>
-      <SearchBox lang={lang} placeholder={ui.searchPlaceholder} empty={ui.searchEmpty} />
+      <h1 className="sr-only">{ui.searchTitle}</h1>
+      <SearchBox
+        lang={lang}
+        s={{
+          placeholder: ui.searchPlaceholder,
+          empty: ui.searchEmpty,
+          all: ui.chipAll,
+          videos: ui.filterVideos,
+          tools: ui.toolsTitle,
+          posts: ui.postsTitle,
+          recent: ui.searchRecent,
+          clear: ui.searchClear,
+          views: ui.viewsWord,
+        }}
+      />
     </div>
   );
 }

@@ -246,3 +246,71 @@ export async function getFollowerCount(scope: string): Promise<number> {
   const [row] = await db.select({ n: count() }).from(subscriptions).where(eq(subscriptions.scope, scope));
   return row.n;
 }
+
+/* ---------- the bell ---------- */
+
+export interface NotificationItem {
+  kind: 'video' | 'tool';
+  id: number;
+  title: string;
+  titleEn: string | null;
+  slug: string;
+  toolName: string | null;
+  toolNameEn: string | null;
+  thumb: string | null;
+  youtubeId: string | null;
+  date: Date;
+  isNew: boolean;
+}
+
+// New videos and tools from what this person follows (the whole channel or single tools).
+// "New" means published after they last opened the notifications page (or after they started following).
+export async function getNotifications(userId: string, limit = 30): Promise<{ items: NotificationItem[]; unread: number }> {
+  const db = await getDb();
+  const [subs, [me]] = await Promise.all([
+    db.select().from(subscriptions).where(eq(subscriptions.userId, userId)),
+    db.select({ seen: users.notificationsSeenAt }).from(users).where(eq(users.id, userId)),
+  ]);
+  if (subs.length === 0) return { items: [], unread: 0 };
+  const everything = subs.some((x) => x.scope === 'all');
+  const toolIds = new Set(subs.filter((x) => x.scope.startsWith('tool:')).map((x) => Number(x.scope.slice(5))));
+  const firstFollow = new Date(Math.min(...subs.map((x) => x.createdAt.getTime())));
+  const since = me?.seen ?? firstFollow;
+
+  const [vids, tls] = await Promise.all([getVideos({ limit: 60 }), getTools()]);
+  const items: NotificationItem[] = [
+    ...vids
+      .filter((v) => everything || (v.toolId != null && toolIds.has(v.toolId)))
+      .map((v) => ({
+        kind: 'video' as const,
+        id: v.id,
+        title: v.title,
+        titleEn: v.titleEn,
+        slug: v.slug,
+        toolName: v.tool?.name ?? null,
+        toolNameEn: v.tool?.nameEn ?? null,
+        thumb: v.thumbnailUrl,
+        youtubeId: v.youtubeId,
+        date: v.publishedAt,
+        isNew: v.publishedAt > since,
+      })),
+    ...tls
+      .filter((x) => everything || toolIds.has(x.id))
+      .map((x) => ({
+        kind: 'tool' as const,
+        id: x.id,
+        title: x.name,
+        titleEn: x.nameEn,
+        slug: x.slug,
+        toolName: x.name,
+        toolNameEn: x.nameEn,
+        thumb: x.iconUrl,
+        youtubeId: null,
+        date: x.createdAt,
+        isNew: x.createdAt > since,
+      })),
+  ]
+    .sort((a, b) => b.date.getTime() - a.date.getTime())
+    .slice(0, limit);
+  return { items, unread: items.filter((i) => i.isNew).length };
+}

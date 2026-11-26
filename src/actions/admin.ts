@@ -32,11 +32,18 @@ const url = (fd: FormData, k: string): string | null => {
     return v.startsWith('/uploads/') ? v : null;
   }
 };
-const dateOr = (fd: FormData, k: string, d: Date) => {
+// The form only has a day, not a time. Today means "now"; an unchanged day keeps the stored time;
+// any other day is that day at midnight. This keeps "newest first" and the bell honest.
+const dayOf = (d: Date) => d.toISOString().slice(0, 10);
+function publishDate(fd: FormData, k: string, existing?: Date | null): Date {
   const v = text(fd, k);
-  const date = v ? new Date(v) : d;
-  return Number.isNaN(date.getTime()) ? d : date;
-};
+  const now = new Date();
+  if (!v) return existing ?? now;
+  if (existing && dayOf(existing) === v) return existing;
+  if (v === dayOf(now)) return now;
+  const date = new Date(`${v}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? (existing ?? now) : date;
+}
 
 // make "slug" unique by adding -2, -3 … when taken
 async function uniqueSlug(table: typeof tools | typeof videos | typeof posts, wanted: string, selfId?: number): Promise<string> {
@@ -77,6 +84,7 @@ export async function saveVideo(fd: FormData) {
   const youtubeId = link ? parseYoutubeId(link) : null;
   if (link && !youtubeId) redirect(id ? `/admin/videos/${id}?error=youtube` : '/admin/videos/new?error=youtube');
 
+  const [before] = id ? await db.select({ at: videos.publishedAt }).from(videos).where(eq(videos.id, id)) : [];
   const values = {
     title,
     titleEn: orNull(fd, 'titleEn'),
@@ -87,7 +95,7 @@ export async function saveVideo(fd: FormData) {
     duration: orNull(fd, 'duration'),
     vertical: flag(fd, 'vertical'),
     thumbnailUrl: url(fd, 'thumbnailUrl'),
-    publishedAt: dateOr(fd, 'publishedAt', new Date()),
+    publishedAt: publishDate(fd, 'publishedAt', before?.at),
     published: flag(fd, 'published'),
     isSample: false,
   };
@@ -158,6 +166,7 @@ export async function savePost(fd: FormData) {
   if (!title) redirect(id ? `/admin/posts/${id}?error=title` : '/admin/posts/new?error=title');
 
   const tags = text(fd, 'tags').split(',').map((s) => s.trim()).filter(Boolean);
+  const [before] = id ? await db.select({ at: posts.publishedAt }).from(posts).where(eq(posts.id, id)) : [];
   const values = {
     title,
     titleEn: orNull(fd, 'titleEn'),
@@ -167,7 +176,7 @@ export async function savePost(fd: FormData) {
     bodyEn: orNull(fd, 'bodyEn') ? String(fd.get('bodyEn')) : null,
     coverUrl: url(fd, 'coverUrl'),
     tags,
-    publishedAt: dateOr(fd, 'publishedAt', new Date()),
+    publishedAt: publishDate(fd, 'publishedAt', before?.at),
     published: flag(fd, 'published'),
     isSample: false,
   };

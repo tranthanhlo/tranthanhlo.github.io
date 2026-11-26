@@ -4,6 +4,7 @@ import { notFound } from 'next/navigation';
 import { ActionBar } from '@/components/ActionBar';
 import { Comments } from '@/components/Comments';
 import { PostExtras } from '@/components/PostExtras';
+import { ViewPing } from '@/components/ViewPing';
 import { devLoginEnabled } from '@/lib/admin';
 import { formatDate, href, isLang, pick, strings, t, timeAgo } from '@/lib/i18n';
 import { renderMarkdown } from '@/lib/markdown';
@@ -53,9 +54,10 @@ export default async function PostPage({ params }: Props) {
   return (
     <article className="pad mx-auto max-w-2xl py-6">
       <PostExtras copy={ui.copy} copied={ui.copied} />
+      <ViewPing type="post" id={post.id} />
       <header>
         <p className="text-xs uppercase tracking-[0.16em] text-faint">
-          {formatDate(post.publishedAt, lang)} · {ui.minRead(readingTime(body))}
+          {formatDate(post.publishedAt, lang)} · {ui.viewsCount(post.views)} · {ui.minRead(readingTime(body))}
           {post.updatedAt && <span> · {ui.updated} {formatDate(post.updatedAt, lang)}</span>}
           {post.isSample && <span className="ml-2 font-semibold text-accent">{ui.sample}</span>}
         </p>
