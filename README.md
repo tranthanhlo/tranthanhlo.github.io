@@ -123,6 +123,20 @@ Danh sách và trang chi tiết công khai (video, tool, bài) được lưu t�
 - Bình luận lưu và hiển thị dạng chữ thường (không HTML). Markdown của bài viết được lọc bằng `sanitize-html`.
 - Tải ảnh: chỉ admin, tối đa 5MB, kiểm tra loại ảnh bằng nội dung file chứ không tin tên file.
 
+## Chuyển blog cũ (tranthanhlo.github.io)
+
+Sau khi trang mới chạy ổn trên Vercel, đổi địa chỉ cũ thành trang chuyển hướng, giữ nguyên đường dẫn (`/blog/xin-chao` → `<địa chỉ mới>/blog/xin-chao`):
+
+```bash
+node scripts/make-redirect.mjs https://dia-chi-moi.com redirect-site
+git switch --orphan gh-pages
+cp -r redirect-site/. . && rm -rf redirect-site
+git add -A && git commit -m "Redirect to the new site" && git push origin gh-pages
+git switch main
+```
+
+Rồi vào GitHub: **Settings → Pages → Build and deployment → Deploy from a branch → `gh-pages` / root**. Nhánh `main` giờ chứa trang Next.js nên không còn dùng cho GitHub Pages.
+
 ## Các phiên bản cũ
 
 Có hai nhánh lưu lại các phiên bản trước của trang này:
