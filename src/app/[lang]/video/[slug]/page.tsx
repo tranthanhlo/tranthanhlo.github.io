@@ -5,6 +5,7 @@ import { ActionBar } from '@/components/ActionBar';
 import { Comments } from '@/components/Comments';
 import { Expandable } from '@/components/Expandable';
 import { LitePlayer } from '@/components/LitePlayer';
+import { PlayerSlot } from '@/components/player/PlayerSlot';
 import { SubscribeButton } from '@/components/SubscribeButton';
 import { ToolIcon } from '@/components/ToolIcon';
 import { ViewPing } from '@/components/ViewPing';
@@ -15,6 +16,7 @@ import { renderMarkdown } from '@/lib/markdown';
 import { getComments, getEngagement, getFollowerCount, getRelatedVideos, getSubscriptionScopes, getVideoBySlug } from '@/lib/queries';
 import { loadEngage } from '@/lib/feed';
 import { getSessionUser } from '@/lib/session';
+import { toCommentItems } from '@/lib/comments';
 import { youtubeEmbed, youtubeThumb } from '@/lib/youtube';
 import { abs } from '@/lib/site';
 
@@ -49,7 +51,7 @@ export default async function VideoPage({ params }: Props) {
   const me = await getSessionUser();
   const [engagement, comments, related, scopes, desc, followers] = await Promise.all([
     getEngagement('video', video.id, me?.id),
-    getComments('video', video.id),
+    getComments('video', video.id, { userId: me?.id }),
     getRelatedVideos(video),
     me ? getSubscriptionScopes(me.id) : Promise.resolve([] as string[]),
     renderMarkdown(pick(lang, video.description, video.descriptionEn)),
@@ -85,14 +87,15 @@ export default async function VideoPage({ params }: Props) {
       <div className="min-w-0 flex-1">
         {/* the player stays at the top while the page scrolls */}
         <div className={`bg-black max-lg:pt-[env(safe-area-inset-top)] lg:static lg:overflow-hidden lg:rounded-xl ${video.vertical ? '' : 'sticky top-0 z-30'}`}>
-          <LitePlayer
-            youtubeId={video.youtubeId}
-            thumbnailUrl={video.thumbnailUrl}
-            title={title}
-            toolName={toolName}
-            vertical={video.vertical}
-            s={strings(lang, 'play', 'videoSoon')}
-          />
+          {video.youtubeId ? (
+            <PlayerSlot
+              video={{ id: video.id, youtubeId: video.youtubeId, title, subtitle: toolName ?? '', path: href(lang, `/video/${video.slug}`), vertical: video.vertical }}
+              thumbnailUrl={video.thumbnailUrl}
+              playLabel={ui.play}
+            />
+          ) : (
+            <LitePlayer youtubeId={null} thumbnailUrl={video.thumbnailUrl} title={title} toolName={toolName} vertical={video.vertical} s={strings(lang, 'play', 'videoSoon')} />
+          )}
         </div>
 
         <div className="pad grid gap-4 py-4 lg:px-0">
@@ -138,18 +141,11 @@ export default async function VideoPage({ params }: Props) {
             id={video.id}
             me={me ? { id: me.id, isAdmin: me.isAdmin } : null}
             dev={dev}
-            items={comments.map((c) => ({
-              id: c.id,
-              parentId: c.parentId,
-              body: c.body,
-              when: timeAgo(c.createdAt, lang, now),
-              edited: c.edited,
-              userId: c.userId,
-              userName: c.userName,
-              userImage: c.userImage,
-              isAdmin: c.isAdmin,
-            }))}
-            s={{ ...signIn, ...strings(lang, 'comments', 'noComments', 'commentPlaceholder', 'send', 'reply', 'edit', 'delete', 'cancel', 'errTooFast', 'errEmpty', 'errTooLong', 'errBanned', 'errGeneric') }}
+            items={toCommentItems(comments.items, lang, now)}
+            hasMore={comments.hasMore}
+            total={engagement.comments}
+            lang={lang}
+            s={{ ...signIn, ...strings(lang, 'comments', 'noComments', 'commentPlaceholder', 'send', 'reply', 'edit', 'delete', 'cancel', 'errTooFast', 'errEmpty', 'errTooLong', 'errBanned', 'errGeneric', 'loadMoreComments', 'sortTop', 'sortNew', 'like', 'liked') }}
           />
         </div>
       </div>

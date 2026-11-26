@@ -22,6 +22,8 @@ const paths = {
   trash: 'M5 7h14M10 7V4h4v3m-7 0 1 13h8l1-13',
   edit: 'M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4',
   chevron: 'm9 6 6 6-6 6',
+  chevronDown: 'm6 9 6 6 6-6',
+  pause: 'M8 5v14M16 5v14',
   shorts: 'M8 3h8a3 3 0 0 1 3 3v12a3 3 0 0 1-3 3H8a3 3 0 0 1-3-3V6a3 3 0 0 1 3-3Zm2 6.5v5l4.5-2.5L10 9.5Z',
   plusCircle: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18Zm0-13v8M8 12h8',
   volumeOff: 'M4 9.5v5h3.5L12 18.5v-13L7.5 9.5H4Zm12 .5 5 5m0-5-5 5',

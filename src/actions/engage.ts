@@ -4,8 +4,11 @@ import { and, count, desc, eq, sql } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import type { TargetType } from '@/db/schema';
 import { AuthError, getSessionUser, requireUser } from '@/lib/session';
+import { getComments, type CommentSort } from '@/lib/queries';
+import { toCommentItems } from '@/lib/comments';
+import { isLang } from '@/lib/i18n';
 
-const { likes, saves, comments, subscriptions, videos, posts, tools, users } = schema;
+const { likes, saves, comments, subscriptions, videos, posts, tools, users, commentLikes } = schema;
 
 export type Result<T = object> = ({ ok: true } & T) | { ok: false; error: string };
 
@@ -166,5 +169,34 @@ export async function markNotificationsSeen(): Promise<void> {
     await db.update(users).set({ notificationsSeenAt: new Date() }).where(eq(users.id, user.id));
   } catch {
     // signed out: nothing to remember
+  }
+}
+
+/* ---------- more comments / comment likes ---------- */
+
+// The next page of comments (anyone can read them)
+export async function loadComments(type: unknown, id: unknown, lang: unknown, sort: unknown, offset: unknown) {
+  if (!isType(type) || !Number.isInteger(id) || !Number.isInteger(offset) || (offset as number) < 0) return { items: [], hasMore: false };
+  const l = typeof lang === 'string' && isLang(lang) ? lang : 'vi';
+  const me = await getSessionUser();
+  const page = await getComments(type, id as number, { userId: me?.id, sort: (sort === 'new' ? 'new' : 'top') as CommentSort, offset: offset as number });
+  return { items: toCommentItems(page.items, l), hasMore: page.hasMore };
+}
+
+export async function toggleCommentLike(commentId: unknown): Promise<Result<{ on: boolean; total: number }>> {
+  try {
+    if (!Number.isInteger(commentId)) return { ok: false, error: 'bad-input' };
+    const user = await requireUser();
+    const db = await getDb();
+    const [c] = await db.select({ id: comments.id }).from(comments).where(and(eq(comments.id, commentId as number), eq(comments.hidden, false)));
+    if (!c) return { ok: false, error: 'not-found' };
+    const key = and(eq(commentLikes.userId, user.id), eq(commentLikes.commentId, c.id));
+    const [existing] = await db.select().from(commentLikes).where(key);
+    if (existing) await db.delete(commentLikes).where(key);
+    else await db.insert(commentLikes).values({ userId: user.id, commentId: c.id }).onConflictDoNothing();
+    const [{ n }] = await db.select({ n: count() }).from(commentLikes).where(eq(commentLikes.commentId, c.id));
+    return { ok: true, on: !existing, total: n };
+  } catch (e) {
+    return fail(e);
   }
 }

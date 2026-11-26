@@ -3,6 +3,7 @@ import { notFound } from 'next/navigation';
 import '../globals.css';
 import { TopBar } from '@/components/TopBar';
 import { TabBar } from '@/components/TabBar';
+import { PlayerProvider } from '@/components/player/PlayerProvider';
 import { isLang, t } from '@/lib/i18n';
 import { SITE, SITE_URL } from '@/lib/site';
 import { getSessionUser } from '@/lib/session';
@@ -53,11 +54,13 @@ export default async function LangLayout({ children, params }: { children: React
         <a className="skip-link" href="#noi-dung">
           {ui.skip}
         </a>
-        <TopBar lang={lang} name={SITE.name} signedIn={!!me} badge={unread} labels={{ search: ui.search, bell: unread ? ui.notifUnread(unread) : ui.notifTitle }} />
-        <TabBar lang={lang} name={SITE.name} avatar={me?.image} isAdmin={me?.isAdmin} labels={{ home: ui.tabHome, shorts: ui.tabShorts, create: ui.tabCreate, you: ui.tabYou }} />
-        <main id="noi-dung" tabIndex={-1} className="app-main outline-none">
-          {children}
-        </main>
+        <PlayerProvider labels={{ minimize: ui.minimize, expand: ui.expand, pause: ui.pause, resume: ui.resume, closePlayer: ui.closePlayer, miniPlayer: ui.miniPlayer }}>
+          <TopBar lang={lang} name={SITE.name} signedIn={!!me} badge={unread} labels={{ search: ui.search, bell: unread ? ui.notifUnread(unread) : ui.notifTitle }} />
+          <TabBar lang={lang} name={SITE.name} avatar={me?.image} isAdmin={me?.isAdmin} labels={{ home: ui.tabHome, shorts: ui.tabShorts, create: ui.tabCreate, you: ui.tabYou }} />
+          <main id="noi-dung" tabIndex={-1} className="app-main outline-none">
+            {children}
+          </main>
+        </PlayerProvider>
       </body>
     </html>
   );

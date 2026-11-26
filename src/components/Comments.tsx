@@ -1,11 +1,11 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { Fragment, useState, useTransition } from 'react';
+import { Fragment, useEffect, useState, useTransition } from 'react';
 import { Icon } from './Icon';
 import { Sheet } from './Sheet';
 import { SignInSheet, type SignInText } from './SignInSheet';
-import { addComment, deleteComment, editComment } from '@/actions/engage';
+import { addComment, deleteComment, editComment, loadComments, toggleCommentLike } from '@/actions/engage';
 import type { TargetType } from '@/db/schema';
 
 export interface CommentItem {
@@ -18,6 +18,8 @@ export interface CommentItem {
   userName: string;
   userImage: string | null;
   isAdmin: boolean;
+  likes: number;
+  liked: boolean;
 }
 
 type Strings = SignInText & {
@@ -34,12 +36,20 @@ type Strings = SignInText & {
   errTooLong: string;
   errBanned: string;
   errGeneric: string;
+  loadMoreComments: string;
+  sortTop: string;
+  sortNew: string;
+  like: string;
+  liked: string;
 };
 
 interface Props {
   type: TargetType;
   id: number;
   items: CommentItem[];
+  hasMore: boolean;
+  total: number;
+  lang: string;
   me: { id: string; isAdmin: boolean } | null;
   dev: boolean;
   s: Strings;
@@ -67,7 +77,7 @@ function Avatar({ name, image }: { name: string; image: string | null }) {
   );
 }
 
-export function Comments({ type, id, items, me, dev, s }: Props) {
+export function Comments({ type, id, items, hasMore, total, lang, me, dev, s }: Props) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [gate, setGate] = useState(false);
@@ -76,9 +86,48 @@ export function Comments({ type, id, items, me, dev, s }: Props) {
   const [editing, setEditing] = useState<{ id: number; body: string } | null>(null);
   const [error, setError] = useState('');
   const [pending, start] = useTransition();
+  const [list, setList] = useState(items);
+  const [more, setMore] = useState(hasMore);
+  const [sort, setSort] = useState<'top' | 'new'>('top');
 
-  const top = items.filter((c) => c.parentId === null);
-  const repliesOf = (cid: number) => items.filter((c) => c.parentId === cid);
+  // fresh comments from the server (after posting or deleting): start again from the first page
+  useEffect(() => {
+    setList(items);
+    setMore(hasMore);
+    setSort('top');
+  }, [items, hasMore]);
+
+  const top = list.filter((c) => c.parentId === null);
+  const repliesOf = (cid: number) => list.filter((c) => c.parentId === cid);
+
+  function changeSort(next: 'top' | 'new') {
+    if (next === sort) return;
+    setSort(next);
+    start(async () => {
+      const r = await loadComments(type, id, lang, next, 0);
+      setList(r.items);
+      setMore(r.hasMore);
+    });
+  }
+
+  function loadMore() {
+    start(async () => {
+      const r = await loadComments(type, id, lang, sort, top.length);
+      setList((old) => [...old, ...r.items.filter((c) => !old.some((o) => o.id === c.id))]);
+      setMore(r.hasMore);
+    });
+  }
+
+  function likeComment(c: CommentItem) {
+    if (!me) return setGate(true);
+    const flip = (on: boolean, total: number) => setList((old) => old.map((x) => (x.id === c.id ? { ...x, liked: on, likes: total } : x)));
+    flip(!c.liked, c.likes + (c.liked ? -1 : 1));
+    start(async () => {
+      const r = await toggleCommentLike(c.id);
+      if (r.ok) flip(r.on, r.total);
+      else flip(c.liked, c.likes);
+    });
+  }
   const first = top[0];
 
   const message = (code: string) =>
@@ -120,7 +169,17 @@ export function Comments({ type, id, items, me, dev, s }: Props) {
             {c.edited && <span> · ✎</span>}
           </p>
           <p className="mt-0.5 whitespace-pre-wrap break-words text-[15px]">{linkify(c.body)}</p>
-          <div className="-ml-3 flex">
+          <div className="-ml-3 flex items-center">
+            <button
+              type="button"
+              onClick={() => likeComment(c)}
+              aria-pressed={c.liked}
+              aria-label={c.liked ? s.liked : s.like}
+              className="press flex min-h-11 items-center gap-1.5 px-3 text-[13px] text-soft"
+            >
+              <Icon name="like" size={16} filled={c.liked} />
+              {c.likes > 0 && <span>{c.likes}</span>}
+            </button>
             {!reply && (
               <button type="button" className="press min-h-11 px-3 text-[13px] font-medium text-soft" onClick={() => (me ? (setEditing(null), setReplyTo(c)) : setGate(true))}>
                 {s.reply}
@@ -148,12 +207,12 @@ export function Comments({ type, id, items, me, dev, s }: Props) {
         type="button"
         onClick={() => setOpen(true)}
         className="press block w-full rounded-xl bg-surface p-3 text-left"
-        aria-label={`${s.comments}: ${items.length}`}
+        aria-label={`${s.comments}: ${total}`}
       >
         <span className="flex items-center gap-2 text-sm font-semibold">
           <Icon name="chat" size={18} />
           {s.comments}
-          <span className="font-normal text-faint">{items.length}</span>
+          <span className="font-normal text-faint">{total}</span>
         </span>
         {first ? (
           <span className="mt-2 flex items-center gap-2">
@@ -165,8 +224,21 @@ export function Comments({ type, id, items, me, dev, s }: Props) {
         )}
       </button>
 
-      <Sheet open={open} onClose={() => setOpen(false)} title={`${s.comments} (${items.length})`} closeLabel={s.close} tall>
+      <Sheet open={open} onClose={() => setOpen(false)} title={`${s.comments} (${total})`} closeLabel={s.close} tall>
         <div className="flex h-full flex-col">
+          <div className="flex gap-2 px-4 pt-3" role="group">
+            {(['top', 'new'] as const).map((k) => (
+              <button
+                key={k}
+                type="button"
+                aria-pressed={sort === k}
+                onClick={() => changeSort(k)}
+                className={`press min-h-9 rounded-lg px-3 text-sm font-medium ${sort === k ? 'bg-chip text-chip-ink' : 'bg-surface'}`}
+              >
+                {k === 'top' ? s.sortTop : s.sortNew}
+              </button>
+            ))}
+          </div>
           <ul className="flex-1 overflow-y-auto px-4 pb-4">
             {top.length === 0 && <li className="py-8 text-center text-soft">{s.noComments}</li>}
             {top.map((c) => (
@@ -175,6 +247,13 @@ export function Comments({ type, id, items, me, dev, s }: Props) {
                 {repliesOf(c.id).map((r) => row(r, true))}
               </Fragment>
             ))}
+            {more && (
+              <li className="mt-4">
+                <button type="button" onClick={loadMore} disabled={pending} className="press min-h-11 w-full rounded-full bg-surface text-sm font-semibold disabled:opacity-50">
+                  {s.loadMoreComments}
+                </button>
+              </li>
+            )}
           </ul>
 
           <form onSubmit={submit} className="border-t border-line bg-bg p-3">

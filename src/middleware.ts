@@ -24,6 +24,9 @@ export default auth((req) => {
 
   if (pathname === '/en' || pathname.startsWith('/en/')) return NextResponse.next();
 
+  // share pictures are linked with their /vi/ address; serve them as they are
+  if (pathname.startsWith('/vi/') && /\/opengraph-image/.test(pathname)) return NextResponse.next();
+
   if (pathname === '/vi' || pathname.startsWith('/vi/')) {
     const url = req.nextUrl.clone();
     url.pathname = pathname.slice(3) || '/';

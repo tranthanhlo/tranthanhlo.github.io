@@ -6,6 +6,8 @@ const config: NextConfig = {
   images: { unoptimized: true },
   poweredByHeader: false,
   devIndicators: false,
+  // the share pictures read their fonts from disk
+  outputFileTracingIncludes: { '/[lang]/**': ['./assets/fonts/**'] },
 };
 
 export default config;

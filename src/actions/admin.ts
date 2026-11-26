@@ -292,3 +292,14 @@ export async function sendNotification(fd: FormData) {
   await db.insert(notificationsSent).values({ kind, targetId: id, recipients: result.sent }).onConflictDoNothing();
   redirect(`/admin/notify?result=sent&n=${result.sent}`);
 }
+
+/* ---------- tool order (drag and drop in /admin/tools) ---------- */
+
+export async function reorderTools(ids: unknown): Promise<void> {
+  await requireAdmin();
+  if (!Array.isArray(ids) || !ids.every((x) => Number.isInteger(x))) return;
+  const db = await getDb();
+  for (const [i, id] of (ids as number[]).entries()) {
+    await db.update(tools).set({ sortOrder: i + 1 }).where(eq(tools.id, id));
+  }
+}

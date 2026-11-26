@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import type { TargetType } from '@/db/schema';
 
-const { tools, videos, posts, comments, likes, saves, subscriptions, users } = schema;
+const { tools, videos, posts, comments, likes, saves, subscriptions, users, commentLikes } = schema;
 
 export type Tool = typeof tools.$inferSelect;
 export type Video = typeof videos.$inferSelect;
@@ -149,9 +149,19 @@ export interface CommentView {
   userName: string;
   userImage: string | null;
   isAdmin: boolean;
+  likes: number;
+  liked: boolean;
 }
 
-export async function getComments(type: TargetType, id: number): Promise<CommentView[]> {
+export type CommentSort = 'top' | 'new';
+
+// One page of top-level comments (with all their replies), sorted by likes ("top") or by date ("new").
+// A personal site has few comments, so they are read in one go and paged here.
+export async function getComments(
+  type: TargetType,
+  id: number,
+  { userId, sort = 'top', offset = 0, limit = 20 }: { userId?: string | null; sort?: CommentSort; offset?: number; limit?: number } = {},
+): Promise<{ items: CommentView[]; hasMore: boolean }> {
   const db = await getDb();
   const rows = await db
     .select({
@@ -169,7 +179,18 @@ export async function getComments(type: TargetType, id: number): Promise<Comment
     .innerJoin(users, eq(comments.userId, users.id))
     .where(and(eq(comments.targetType, type), eq(comments.targetId, id), eq(comments.hidden, false)))
     .orderBy(asc(comments.createdAt));
-  return rows.map((r) => ({
+  if (rows.length === 0) return { items: [], hasMore: false };
+
+  const ids = rows.map((r) => r.id);
+  const [counts, mine] = await Promise.all([
+    db.select({ id: commentLikes.commentId, n: count() }).from(commentLikes).where(inArray(commentLikes.commentId, ids)).groupBy(commentLikes.commentId),
+    userId
+      ? db.select({ id: commentLikes.commentId }).from(commentLikes).where(and(eq(commentLikes.userId, userId), inArray(commentLikes.commentId, ids)))
+      : Promise.resolve([] as { id: number }[]),
+  ]);
+  const likeCount = new Map(counts.map((c) => [c.id, c.n]));
+  const likedSet = new Set(mine.map((m) => m.id));
+  const all: CommentView[] = rows.map((r) => ({
     id: r.id,
     parentId: r.parentId,
     body: r.body,
@@ -179,7 +200,18 @@ export async function getComments(type: TargetType, id: number): Promise<Comment
     userName: r.userName ?? 'Ẩn danh',
     userImage: r.userImage,
     isAdmin: r.role === 'admin',
+    likes: likeCount.get(r.id) ?? 0,
+    liked: likedSet.has(r.id),
   }));
+
+  const top = all.filter((c) => c.parentId === null);
+  top.sort((a, b) =>
+    sort === 'top' ? b.likes - a.likes || b.createdAt.getTime() - a.createdAt.getTime() : b.createdAt.getTime() - a.createdAt.getTime(),
+  );
+  const page = top.slice(offset, offset + limit);
+  const pageIds = new Set(page.map((c) => c.id));
+  const replies = all.filter((c) => c.parentId !== null && pageIds.has(c.parentId));
+  return { items: [...page, ...replies], hasMore: offset + limit < top.length };
 }
 
 /* ---------- follows ---------- */

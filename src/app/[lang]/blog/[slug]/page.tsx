@@ -6,10 +6,11 @@ import { Comments } from '@/components/Comments';
 import { PostExtras } from '@/components/PostExtras';
 import { ViewPing } from '@/components/ViewPing';
 import { devLoginEnabled } from '@/lib/admin';
-import { formatDate, href, isLang, pick, strings, t, timeAgo } from '@/lib/i18n';
+import { formatDate, href, isLang, pick, strings, t } from '@/lib/i18n';
 import { renderMarkdown } from '@/lib/markdown';
 import { getComments, getEngagement, getNeighbours, getPostBySlug } from '@/lib/queries';
 import { getSessionUser } from '@/lib/session';
+import { toCommentItems } from '@/lib/comments';
 import { readingTime } from '@/lib/text';
 
 export const dynamic = 'force-dynamic';
@@ -44,7 +45,7 @@ export default async function PostPage({ params }: Props) {
     renderMarkdown(body),
     getNeighbours(post),
     getEngagement('post', post.id, me?.id),
-    getComments('post', post.id),
+    getComments('post', post.id, { userId: me?.id }),
   ]);
   const title = pick(lang, post.title, post.titleEn);
   const dev = devLoginEnabled();
@@ -109,18 +110,11 @@ export default async function PostPage({ params }: Props) {
           id={post.id}
           me={me ? { id: me.id, isAdmin: me.isAdmin } : null}
           dev={dev}
-          items={comments.map((c) => ({
-            id: c.id,
-            parentId: c.parentId,
-            body: c.body,
-            when: timeAgo(c.createdAt, lang, now),
-            edited: c.edited,
-            userId: c.userId,
-            userName: c.userName,
-            userImage: c.userImage,
-            isAdmin: c.isAdmin,
-          }))}
-          s={{ ...signIn, ...strings(lang, 'comments', 'noComments', 'commentPlaceholder', 'send', 'reply', 'edit', 'delete', 'cancel', 'errTooFast', 'errEmpty', 'errTooLong', 'errBanned', 'errGeneric') }}
+          items={toCommentItems(comments.items, lang, now)}
+          hasMore={comments.hasMore}
+          total={engagement.comments}
+          lang={lang}
+          s={{ ...signIn, ...strings(lang, 'comments', 'noComments', 'commentPlaceholder', 'send', 'reply', 'edit', 'delete', 'cancel', 'errTooFast', 'errEmpty', 'errTooLong', 'errBanned', 'errGeneric', 'loadMoreComments', 'sortTop', 'sortNew', 'like', 'liked') }}
         />
       </div>
 
