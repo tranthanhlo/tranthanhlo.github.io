@@ -5,7 +5,7 @@ import { TopBar } from '@/components/TopBar';
 import { TabBar } from '@/components/TabBar';
 import { PlayerProvider } from '@/components/player/PlayerProvider';
 import { isLang, t } from '@/lib/i18n';
-import { SITE, SITE_URL } from '@/lib/site';
+import { IS_STAGING, SITE, SITE_URL } from '@/lib/site';
 import { getSessionUser } from '@/lib/session';
 import { getNotifications } from '@/lib/queries';
 
@@ -25,6 +25,7 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
   const ui = t(lang);
   return {
     metadataBase: new URL(SITE_URL),
+    robots: IS_STAGING ? { index: false, follow: false } : undefined,
     title: { default: SITE.name, template: `%s · ${SITE.name}` },
     description: ui.siteDescription,
     applicationName: SITE.name,
@@ -51,6 +52,14 @@ export default async function LangLayout({ children, params }: { children: React
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
+        {IS_STAGING && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed left-1/2 top-1 z-[100] -translate-x-1/2 rounded-full bg-red-600 px-3 py-0.5 text-[11px] font-bold tracking-widest text-white shadow"
+          >
+            STAGING
+          </div>
+        )}
         <a className="skip-link" href="#noi-dung">
           {ui.skip}
         </a>

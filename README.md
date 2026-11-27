@@ -46,6 +46,33 @@ Làm một lần, theo thứ tự:
 
 Nội dung mẫu chỉ có ở máy bạn. Trang thật bắt đầu trống cho tới khi bạn thêm tool và video trong `/admin`.
 
+### Thử trên Stage rồi mới lên Production
+
+Có hai môi trường, tách hẳn dữ liệu:
+
+| | Stage | Production |
+|---|---|---|
+| Nhánh git | `staging` | `main` |
+| Địa chỉ | `tranthanhlo-git-staging-ttl18.vercel.app` | `tranthanhlo.vercel.app` |
+| Cơ sở dữ liệu | nhánh Neon `staging` | nhánh Neon chính |
+
+Mỗi lần sửa:
+
+```bash
+git switch staging
+# sửa code, commit
+git push origin staging        # Vercel tự build bản Stage
+```
+
+Mở địa chỉ Stage (có dải đỏ **STAGING** ở đầu trang) và thử: đăng nhập, bình luận, đăng bài trong `/admin`. Migration cũng chạy trên cơ sở dữ liệu Stage trước. Ổn rồi mới đưa lên thật:
+
+```bash
+gh pr create --base main --head staging --fill
+# CI xanh thì gộp (Merge) Pull Request, Vercel tự đưa lên Production
+```
+
+Stage bị chặn công cụ tìm kiếm (`robots.txt` và `noindex`). Biến môi trường của Stage đặt ở Vercel → Settings → Environment Variables, môi trường **Preview**, nhánh `staging`. Địa chỉ Stage phải có trong **Authorized redirect URIs** của Google (`/api/auth/callback/google`).
+
 ### Email thông báo (Theo dõi)
 
 Khi có video hoặc tool mới, vào `/admin/notify` bấm **Gửi thông báo** (gửi bằng tay, mỗi mục một lần). Để gửi được cho người khác, [Resend](https://resend.com) bắt buộc bạn phải có **tên miền riêng đã xác minh**; khi chưa có, Resend chỉ gửi được về chính email của bạn. `EMAIL_FROM` có dạng `Trần Thanh Lộ <thongbao@ten-mien-cua-ban.com>`.
