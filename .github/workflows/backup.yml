@@ -67,7 +67,7 @@ jobs:
             --symmetric --cipher-algo AES256 --output "$name" backup.dump
           rm -f backup.dump
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: ${{ env.NAME }}
           path: ${{ env.NAME }}
