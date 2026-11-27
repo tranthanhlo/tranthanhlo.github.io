@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import '../globals.css';
 import { TopBar } from '@/components/TopBar';
 import { TabBar } from '@/components/TabBar';
 import { PlayerProvider } from '@/components/player/PlayerProvider';
 import { isLang, t } from '@/lib/i18n';
-import { SITE, SITE_URL } from '@/lib/site';
+import { IS_STAGING, SITE, SITE_URL } from '@/lib/site';
 import { getSessionUser } from '@/lib/session';
 import { getNotifications } from '@/lib/queries';
 
@@ -25,6 +26,7 @@ export async function generateMetadata({ params }: { params: Promise<{ lang: str
   const ui = t(lang);
   return {
     metadataBase: new URL(SITE_URL),
+    robots: IS_STAGING ? { index: false, follow: false } : undefined,
     title: { default: SITE.name, template: `%s · ${SITE.name}` },
     description: ui.siteDescription,
     applicationName: SITE.name,
@@ -44,13 +46,24 @@ export default async function LangLayout({ children, params }: { children: React
   const ui = t(lang);
   const me = await getSessionUser();
   const unread = me ? (await getNotifications(me.id)).unread : 0;
+  // set by the middleware; the page's Content-Security-Policy only runs scripts carrying it
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     <html lang={lang} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        {/* browsers hide the nonce from the page after load, so React must not compare it */}
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
+        {IS_STAGING && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none fixed left-1/2 top-1 z-[100] -translate-x-1/2 rounded-full bg-red-600 px-3 py-0.5 text-[11px] font-bold tracking-widest text-white shadow"
+          >
+            STAGING
+          </div>
+        )}
         <a className="skip-link" href="#noi-dung">
           {ui.skip}
         </a>

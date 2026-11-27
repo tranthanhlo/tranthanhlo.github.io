@@ -1,9 +1,23 @@
 import NextAuth from 'next-auth';
-import { NextResponse } from 'next/server';
+import { NextResponse, type NextRequest } from 'next/server';
 import { authConfig } from './auth.config';
 import { isAdminEmail } from '@/lib/admin';
+import { buildCsp, makeNonce } from '@/lib/security';
 
 const { auth } = NextAuth(authConfig);
+
+// Every page gets a Content-Security-Policy with a fresh nonce. The nonce also travels to the
+// server components (x-nonce) and to Next.js itself, which stamps it on its own <script> tags.
+function secured(req: NextRequest, make: (init: { request: { headers: Headers } }) => NextResponse): NextResponse {
+  const nonce = makeNonce();
+  const csp = buildCsp(nonce);
+  const headers = new Headers(req.headers);
+  headers.set('x-nonce', nonce);
+  headers.set('content-security-policy', csp);
+  const res = make({ request: { headers } });
+  res.headers.set('content-security-policy', csp);
+  return res;
+}
 
 // 1. /admin is for admins only.  2. Vietnamese lives at the root: /blog is served by app/[lang] as /vi/blog.
 export default auth((req) => {
@@ -17,12 +31,12 @@ export default auth((req) => {
       return NextResponse.redirect(url);
     }
     if (!isAdminEmail(user.email)) return NextResponse.redirect(new URL('/', req.url));
-    const res = NextResponse.next();
+    const res = secured(req, (init) => NextResponse.next(init));
     res.headers.set('x-robots-tag', 'noindex');
     return res;
   }
 
-  if (pathname === '/en' || pathname.startsWith('/en/')) return NextResponse.next();
+  if (pathname === '/en' || pathname.startsWith('/en/')) return secured(req, (init) => NextResponse.next(init));
 
   // share pictures are linked with their /vi/ address; serve them as they are
   if (pathname.startsWith('/vi/') && /\/opengraph-image/.test(pathname)) return NextResponse.next();
@@ -35,7 +49,7 @@ export default auth((req) => {
 
   const url = req.nextUrl.clone();
   url.pathname = `/vi${pathname === '/' ? '' : pathname}`;
-  return NextResponse.rewrite(url);
+  return secured(req, (init) => NextResponse.rewrite(url, init));
 });
 
 export const config = {

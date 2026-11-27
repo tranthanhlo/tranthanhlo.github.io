@@ -46,6 +46,33 @@ Làm một lần, theo thứ tự:
 
 Nội dung mẫu chỉ có ở máy bạn. Trang thật bắt đầu trống cho tới khi bạn thêm tool và video trong `/admin`.
 
+### Thử trên Stage rồi mới lên Production
+
+Có hai môi trường, tách hẳn dữ liệu:
+
+| | Stage | Production |
+|---|---|---|
+| Nhánh git | `staging` | `main` |
+| Địa chỉ | `tranthanhlo-git-staging-ttl18.vercel.app` | `tranthanhlo.vercel.app` |
+| Cơ sở dữ liệu | nhánh Neon `preview/staging` (tự tạo, chép từ `main`) | nhánh Neon `main` |
+
+Mỗi lần sửa:
+
+```bash
+git switch staging
+# sửa code, commit
+git push origin staging        # Vercel tự build bản Stage
+```
+
+Mở địa chỉ Stage (có dải đỏ **STAGING** ở đầu trang) và thử: đăng nhập, bình luận, đăng bài trong `/admin`. Migration cũng chạy trên cơ sở dữ liệu Stage trước. Ổn rồi mới đưa lên thật:
+
+```bash
+gh pr create --base main --head staging --fill
+# CI xanh thì gộp (Merge) Pull Request, Vercel tự đưa lên Production
+```
+
+Stage bị chặn công cụ tìm kiếm (`robots.txt` và `noindex`). Nhánh DB của Stage do tích hợp Neon tạo tự động (Vercel → Storage → Neon → *Create Database Branch For Deployment: Preview*), mỗi lần build `staging` tự điền `DATABASE_URL` của nhánh đó, nên thử ghi/xóa thoải mái. Các biến khác của Stage (`AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ADMIN_EMAILS`, `SITE_URL`) đặt ở Vercel → Settings → Environment Variables, môi trường **Preview**. Địa chỉ Stage phải có trong **Authorized redirect URIs** của Google (`/api/auth/callback/google`) thì mới đăng nhập được trên Stage.
+
 ### Email thông báo (Theo dõi)
 
 Khi có video hoặc tool mới, vào `/admin/notify` bấm **Gửi thông báo** (gửi bằng tay, mỗi mục một lần). Để gửi được cho người khác, [Resend](https://resend.com) bắt buộc bạn phải có **tên miền riêng đã xác minh**; khi chưa có, Resend chỉ gửi được về chính email của bạn. `EMAIL_FROM` có dạng `Trần Thanh Lộ <thongbao@ten-mien-cua-ban.com>`.
@@ -93,6 +120,16 @@ scripts/          migrate.ts, seed.ts
 
 ## Sao lưu và khôi phục
 
+- **Tự động mỗi tuần** (`.github/workflows/backup.yml`, sáng thứ Hai, hoặc bấm *Run workflow* ở tab Actions): `pg_dump` toàn bộ DB Production, **thử khôi phục** vào một Postgres tạm và so số hàng, rồi mã hóa AES-256 và lưu thành artifact 90 ngày. Repo công khai nên file luôn được mã hóa trước khi rời máy chạy. Cần 2 secret ở GitHub → Settings → Secrets and variables → Actions:
+  - `BACKUP_DATABASE_URL`: chuỗi kết nối chủ sở hữu (Neon → Connect, role `neondb_owner`).
+  - `BACKUP_PASSPHRASE`: mật khẩu dài do bạn đặt. **Cất kỹ, mất là không mở được backup.**
+
+  Khôi phục từ file đó:
+  ```bash
+  gpg --decrypt tranthanhlo-db-2026-12-01.dump.gpg > backup.dump        # hỏi BACKUP_PASSPHRASE
+  pg_restore --no-owner --no-acl --dbname "<chuỗi kết nối DB trống>" backup.dump
+  ```
+  Sau đó cấp lại quyền cho `app_rw` (câu SQL ở mục Bảo mật) nếu khôi phục sang DB mới.
 - **Tải bản sao lưu**: vào `/admin/backup` bấm *Tải bản sao lưu*, nên làm mỗi tháng một lần. File JSON có email thành viên nên cất riêng tư, **không** đưa lên GitHub. File không chứa mã đăng nhập Google. Ảnh tải lên nằm ở Vercel Blob, không nằm trong file.
 - **Khôi phục vào cơ sở dữ liệu trống** (ví dụ tạo lại Neon):
   ```bash
@@ -116,12 +153,34 @@ scripts/          migrate.ts, seed.ts
 
 Danh sách và trang chi tiết công khai (video, tool, bài) được lưu tạm tối đa 60 giây (`src/lib/cache.ts`). Mọi thay đổi trong `/admin` xóa bộ nhớ đệm ngay nên không phải đợi. Phần riêng của từng người (đã thích, đã lưu, chuông) luôn lấy mới. Khi thêm thao tác ghi mới cho nội dung công khai, gọi `contentChanged()`.
 
-## Bảo mật, ngắn gọn
+## Bảo mật
 
-- Quyền admin chỉ dựa vào email trong biến môi trường, được kiểm tra ở middleware, ở layout `/admin` và **ở đầu mỗi thao tác ghi** (đừng bỏ dòng `requireAdmin()` khi thêm thao tác mới).
+Đã đối chiếu với checklist "安全なウェブサイトの作り方" của IPA (bản 7). Kết quả trong `Kiem-tra-bao-mat-IPA.xlsx`.
+
+**Trong code**
+- Quyền admin chỉ dựa vào email trong biến môi trường, được kiểm tra ở middleware, ở layout `/admin` và **ở đầu mỗi thao tác ghi** (đừng bỏ dòng `requireAdmin()` khi thêm thao tác mới). Mỗi thao tác admin ghi một dòng vào bảng `admin_events` (gọi `logAdmin()`); 30 dòng mới nhất hiện ở `/admin`.
 - Thao tác của người xem (`src/actions/engage.ts`) luôn lọc theo `userId` của người đang đăng nhập, nên không ai sửa/xóa được bình luận của người khác.
 - Bình luận lưu và hiển thị dạng chữ thường (không HTML). Markdown của bài viết được lọc bằng `sanitize-html`.
-- Tải ảnh: chỉ admin, tối đa 5MB, kiểm tra loại ảnh bằng nội dung file chứ không tin tên file.
+- Tải ảnh: chỉ admin, tối đa 5MB, kiểm tra loại ảnh bằng nội dung file; thông tin ẩn (GPS, máy ảnh) bị xóa trước khi lưu (`src/lib/strip-metadata.ts`), chỉ giữ hướng xoay.
+- Header (`src/lib/security.ts`): `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`, và Content-Security-Policy có nonce mới mỗi lần tải trang (tạo trong `src/middleware.ts`). Thêm `<script>` tự viết thì phải gắn `nonce` (xem `src/app/[lang]/layout.tsx`), nếu không trình duyệt sẽ chặn. Nhúng dịch vụ mới (iframe, ảnh, API) thì thêm tên miền vào `buildCsp()`.
+- Phiên đăng nhập hết hạn sau 7 ngày.
+- Lượt xem: mỗi người xem tính một lần mỗi giờ cho mỗi mục, tối đa 120 lượt/giờ; chỉ lưu bản băm một chiều của địa chỉ IP, xóa sau 1 ngày (bảng `view_events`).
+- Lỗi máy chủ: ghi log, và nếu đã cấu hình Resend thì gửi email cho admin (tối đa 1 email/10 phút, `src/instrumentation.ts`). Xóa tài khoản cũng gửi email báo cho chủ tài khoản.
+
+**Ngoài code (cài đặt)**
+- **Xác minh 2 bước** cho Google (tài khoản admin), GitHub, Vercel, Neon, Resend. Chiếm được một trong số này là chiếm được trang.
+- **Tài khoản DB cho trang**: khi có biến `APP_DATABASE_URL`, trang dùng role `app_rw`: đọc/ghi được dữ liệu nhưng **không xóa hay sửa được bảng** (bảng thuộc `neondb_owner`) và không tạo được bảng mới. `DATABASE_URL` (chủ sở hữu) chỉ dùng khi build để chạy migration. Lưu ý: role tạo trên Neon console luôn thuộc nhóm `neon_superuser` (nên vẫn có quyền tạo role/database) và Neon không cho gỡ (`REVOKE` báo *permission denied*). Muốn role hẹp hơn nữa thì tạo bằng SQL (`CREATE ROLE ... LOGIN PASSWORD '...'`, không qua console) rồi cấp quyền như dưới. Quyền đã cấp cho `app_rw` (chạy bằng `neondb_owner` trong Neon → SQL Editor, nhánh `main`):
+  ```sql
+  GRANT USAGE ON SCHEMA public TO app_rw;
+  GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_rw;
+  GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_rw;
+  ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO app_rw;
+  ALTER DEFAULT PRIVILEGES FOR ROLE neondb_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO app_rw;
+  ```
+- **GitHub**: nhánh `main` chỉ nhận Pull Request có CI xanh; bật Secret scanning, Push protection, Dependabot (`.github/dependabot.yml`). CI chạy `npm audit` cho thư viện chạy thật.
+- **Vercel**: bản Stage có Vercel Authentication, người lạ không mở được. Khi bị tấn công dồn dập: Vercel → Firewall → bật **Attack Challenge Mode**.
+- **Lộ khóa** (lỡ dán vào chat, ảnh chụp, commit): tạo khóa mới ngay ở nơi cấp (Google Cloud, Neon *Reset password*, Vercel Blob, Resend), dán vào Vercel rồi Redeploy. Đổi `AUTH_SECRET` sẽ đăng xuất mọi người.
+- Khi có tên miền riêng: khóa chuyển tên miền và bật 2 bước ở nơi mua; đặt SPF, DKIM, DMARC cho email gửi qua Resend.
 
 ## Chuyển blog cũ (tranthanhlo.github.io)
 

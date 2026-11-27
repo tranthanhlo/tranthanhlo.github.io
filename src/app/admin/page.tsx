@@ -3,6 +3,7 @@ import { count, eq } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import { Badge, PageHead } from '@/components/admin/ui';
 import { getPosts, getVideos } from '@/lib/queries';
+import { recentAdminEvents } from '@/lib/audit';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,7 +18,7 @@ export default async function AdminHome() {
     db.select({ n: count() }).from(users),
     db.select({ n: count() }).from(subscriptions),
   ]);
-  const [recentVideos, recentPosts] = await Promise.all([getVideos({ drafts: true, limit: 5 }), getPosts({ drafts: true, limit: 5 })]);
+  const [recentVideos, recentPosts, log] = await Promise.all([getVideos({ drafts: true, limit: 5 }), getPosts({ drafts: true, limit: 5 }), recentAdminEvents(30)]);
 
   const stats = [
     { label: 'Video', n: v.n, to: '/admin/videos' },
@@ -68,6 +69,26 @@ export default async function AdminHome() {
           </ul>
         </section>
       </div>
+
+      <section className="mt-8">
+        <h2 className="mb-2 font-semibold">Nhật ký admin</h2>
+        {log.length === 0 ? (
+          <p className="text-sm text-faint">Chưa có thao tác nào.</p>
+        ) : (
+          <ul className="text-sm">
+            {log.map((e) => (
+              <li key={e.id} className="flex flex-wrap gap-x-3 border-b border-line py-2">
+                <time className="text-faint tabular-nums" dateTime={e.createdAt.toISOString()}>
+                  {e.createdAt.toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })}
+                </time>
+                <span className="font-medium">{e.action}</span>
+                <span className="min-w-0 truncate">{e.target}</span>
+                <span className="ml-auto text-faint">{e.email}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
     </>
   );
 }

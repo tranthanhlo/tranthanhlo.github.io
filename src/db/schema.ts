@@ -218,3 +218,29 @@ export const rateEvents = pgTable(
   },
   (t) => [index('rate_events_user_kind_idx').on(t.userId, t.kind, t.createdAt)],
 );
+
+// Recent views, so one visitor cannot pump up the view count. `visitor` is a one-way hash of the
+// IP address (never the address itself); rows older than a day are swept away.
+export const viewEvents = pgTable(
+  'view_events',
+  {
+    id: serial('id').primaryKey(),
+    visitor: text('visitor').notNull(),
+    target: text('target').notNull(), // "video:12", "post:3"
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('view_events_visitor_idx').on(t.visitor, t.createdAt)],
+);
+
+// What admins did and when (sign-ins, saves, deletes, emails sent)
+export const adminEvents = pgTable(
+  'admin_events',
+  {
+    id: serial('id').primaryKey(),
+    email: text('email').notNull(),
+    action: text('action').notNull(),
+    target: text('target').notNull().default(''),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index('admin_events_created_idx').on(t.createdAt)],
+);
