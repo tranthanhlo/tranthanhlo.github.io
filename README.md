@@ -54,7 +54,7 @@ Có hai môi trường, tách hẳn dữ liệu:
 |---|---|---|
 | Nhánh git | `staging` | `main` |
 | Địa chỉ | `tranthanhlo-git-staging-ttl18.vercel.app` | `tranthanhlo.vercel.app` |
-| Cơ sở dữ liệu | nhánh Neon `staging` | nhánh Neon chính |
+| Cơ sở dữ liệu | nhánh Neon `preview/staging` (tự tạo, chép từ `main`) | nhánh Neon `main` |
 
 Mỗi lần sửa:
 
@@ -71,7 +71,7 @@ gh pr create --base main --head staging --fill
 # CI xanh thì gộp (Merge) Pull Request, Vercel tự đưa lên Production
 ```
 
-Stage bị chặn công cụ tìm kiếm (`robots.txt` và `noindex`). Biến môi trường của Stage đặt ở Vercel → Settings → Environment Variables, môi trường **Preview**, nhánh `staging`. Địa chỉ Stage phải có trong **Authorized redirect URIs** của Google (`/api/auth/callback/google`).
+Stage bị chặn công cụ tìm kiếm (`robots.txt` và `noindex`). Nhánh DB của Stage do tích hợp Neon tạo tự động (Vercel → Storage → Neon → *Create Database Branch For Deployment: Preview*), mỗi lần build `staging` tự điền `DATABASE_URL` của nhánh đó, nên thử ghi/xóa thoải mái. Các biến khác của Stage (`AUTH_SECRET`, `AUTH_GOOGLE_ID`, `AUTH_GOOGLE_SECRET`, `ADMIN_EMAILS`, `SITE_URL`) đặt ở Vercel → Settings → Environment Variables, môi trường **Preview**. Địa chỉ Stage phải có trong **Authorized redirect URIs** của Google (`/api/auth/callback/google`) thì mới đăng nhập được trên Stage.
 
 ### Email thông báo (Theo dõi)
 
@@ -169,9 +169,8 @@ Danh sách và trang chi tiết công khai (video, tool, bài) được lưu t�
 
 **Ngoài code (cài đặt)**
 - **Xác minh 2 bước** cho Google (tài khoản admin), GitHub, Vercel, Neon, Resend. Chiếm được một trong số này là chiếm được trang.
-- **Tài khoản DB cho trang**: Production dùng `APP_DATABASE_URL`, role `app_rw` chỉ được đọc/ghi dữ liệu, không xóa hay sửa bảng. `DATABASE_URL` (chủ sở hữu) chỉ dùng khi build để chạy migration. Bảng mới tạo bằng migration tự cấp quyền cho `app_rw` (đã đặt `ALTER DEFAULT PRIVILEGES`). Quyền của role, chạy bằng `neondb_owner` trong Neon → SQL Editor:
+- **Tài khoản DB cho trang**: khi có biến `APP_DATABASE_URL`, trang dùng role `app_rw`: đọc/ghi được dữ liệu nhưng **không xóa hay sửa được bảng** (bảng thuộc `neondb_owner`) và không tạo được bảng mới. `DATABASE_URL` (chủ sở hữu) chỉ dùng khi build để chạy migration. Lưu ý: role tạo trên Neon console luôn thuộc nhóm `neon_superuser` (nên vẫn có quyền tạo role/database) và Neon không cho gỡ (`REVOKE` báo *permission denied*). Muốn role hẹp hơn nữa thì tạo bằng SQL (`CREATE ROLE ... LOGIN PASSWORD '...'`, không qua console) rồi cấp quyền như dưới. Quyền đã cấp cho `app_rw` (chạy bằng `neondb_owner` trong Neon → SQL Editor, nhánh `main`):
   ```sql
-  REVOKE neon_superuser FROM app_rw;
   GRANT USAGE ON SCHEMA public TO app_rw;
   GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO app_rw;
   GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO app_rw;

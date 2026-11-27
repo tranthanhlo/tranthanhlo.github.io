@@ -31,7 +31,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   return (
     <html lang="vi" suppressHydrationWarning>
       <head>
-        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
         <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
