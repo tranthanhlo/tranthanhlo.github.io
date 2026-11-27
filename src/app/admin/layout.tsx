@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import Link from 'next/link';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 import '../globals.css';
 import { Logo } from '@/components/Logo';
@@ -25,11 +26,12 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const user = await getSessionUser();
   if (!user) redirect('/dang-nhap?next=/admin');
   if (!user.isAdmin) redirect('/');
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     <html lang="vi" suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
         <header className="sticky top-0 z-30 border-b border-line bg-bg/90 backdrop-blur-xl" style={{ paddingTop: 'env(safe-area-inset-top)' }}>

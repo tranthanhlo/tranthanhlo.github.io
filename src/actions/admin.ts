@@ -7,6 +7,7 @@ import { escapeHtml, sendMails, type Mail } from '@/lib/email';
 import { renderMarkdown } from '@/lib/markdown';
 import { requireAdmin } from '@/lib/session';
 import { setBlockedWords } from '@/lib/rate-limit';
+import { logAdmin } from '@/lib/audit';
 import { contentChanged } from '@/lib/cache';
 import { SITE, SITE_URL } from '@/lib/site';
 import { slugify } from '@/lib/text';
@@ -76,7 +77,7 @@ export async function lookupYoutube(input: string): Promise<{ ok: true; id: stri
 }
 
 export async function saveVideo(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const db = await getDb();
   const id = whole(fd, 'id');
   const title = text(fd, 'title');
@@ -106,16 +107,18 @@ export async function saveVideo(fd: FormData) {
   } else {
     await db.insert(videos).values({ ...values, slug: await uniqueSlug(videos, text(fd, 'slug') || title) });
   }
+  await logAdmin(me.email, id ? 'video.update' : 'video.create', id ? `#${id} ${title}` : title);
   contentChanged();
   redirect('/admin/videos?saved=1');
 }
 
 export async function deleteVideo(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const id = whole(fd, 'id');
   const db = await getDb();
   await removeEngagement('video', [id]);
   await db.delete(videos).where(eq(videos.id, id));
+  await logAdmin(me.email, 'video.delete', `#${id}`);
   contentChanged();
   redirect('/admin/videos?deleted=1');
 }
@@ -123,7 +126,7 @@ export async function deleteVideo(fd: FormData) {
 /* ---------- tools ---------- */
 
 export async function saveTool(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const db = await getDb();
   const id = whole(fd, 'id');
   const name = text(fd, 'name');
@@ -148,16 +151,18 @@ export async function saveTool(fd: FormData) {
   };
   if (id) await db.update(tools).set({ ...values, slug: await uniqueSlug(tools, text(fd, 'slug') || name, id) }).where(eq(tools.id, id));
   else await db.insert(tools).values({ ...values, slug: await uniqueSlug(tools, text(fd, 'slug') || name) });
+  await logAdmin(me.email, id ? 'tool.update' : 'tool.create', id ? `#${id} ${name}` : name);
   contentChanged();
   redirect('/admin/tools?saved=1');
 }
 
 export async function deleteTool(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const id = whole(fd, 'id');
   const db = await getDb();
   await db.delete(subscriptions).where(eq(subscriptions.scope, `tool:${id}`));
   await db.delete(tools).where(eq(tools.id, id)); // its videos stay, with no tool
+  await logAdmin(me.email, 'tool.delete', `#${id}`);
   contentChanged();
   redirect('/admin/tools?deleted=1');
 }
@@ -165,7 +170,7 @@ export async function deleteTool(fd: FormData) {
 /* ---------- posts ---------- */
 
 export async function savePost(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const db = await getDb();
   const id = whole(fd, 'id');
   const title = text(fd, 'title');
@@ -188,16 +193,18 @@ export async function savePost(fd: FormData) {
   };
   if (id) await db.update(posts).set({ ...values, updatedAt: new Date(), slug: await uniqueSlug(posts, text(fd, 'slug') || title, id) }).where(eq(posts.id, id));
   else await db.insert(posts).values({ ...values, slug: await uniqueSlug(posts, text(fd, 'slug') || title) });
+  await logAdmin(me.email, id ? 'post.update' : 'post.create', id ? `#${id} ${title}` : title);
   contentChanged();
   redirect('/admin/posts?saved=1');
 }
 
 export async function deletePost(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const id = whole(fd, 'id');
   const db = await getDb();
   await removeEngagement('post', [id]);
   await db.delete(posts).where(eq(posts.id, id));
+  await logAdmin(me.email, 'post.delete', `#${id}`);
   contentChanged();
   redirect('/admin/posts?deleted=1');
 }
@@ -220,26 +227,32 @@ export async function previewMarkdown(md: string): Promise<string> {
 /* ---------- moderation ---------- */
 
 export async function setCommentHidden(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const db = await getDb();
-  await db.update(comments).set({ hidden: fd.get('hidden') === '1' }).where(eq(comments.id, whole(fd, 'id')));
+  const hide = fd.get('hidden') === '1';
+  await db.update(comments).set({ hidden: hide }).where(eq(comments.id, whole(fd, 'id')));
+  await logAdmin(me.email, hide ? 'comment.hide' : 'comment.show', `#${whole(fd, 'id')}`);
   redirect('/admin/comments');
 }
 
 export async function setUserBanned(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const db = await getDb();
   const userId = text(fd, 'userId');
+  const ban = fd.get('banned') === '1';
   // an admin cannot lock themselves out
   const [u] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId));
-  if (u && u.role !== 'admin') await db.update(users).set({ banned: fd.get('banned') === '1' }).where(eq(users.id, userId));
+  if (u && u.role !== 'admin') {
+    await db.update(users).set({ banned: ban }).where(eq(users.id, userId));
+    await logAdmin(me.email, ban ? 'user.ban' : 'user.unban', userId);
+  }
   redirect('/admin/comments');
 }
 
 /* ---------- "new video / tool" emails (sent by hand, once per item) ---------- */
 
 export async function sendNotification(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   const kind = fd.get('kind') === 'tool' ? 'tool' : 'video';
   const id = whole(fd, 'id');
   const db = await getDb();
@@ -298,6 +311,7 @@ export async function sendNotification(fd: FormData) {
   if (result.error) redirect(`/admin/notify?result=error&msg=${encodeURIComponent(result.error)}`);
   if (result.dryRun) redirect(`/admin/notify?result=dry&n=${mails.length}`);
   await db.insert(notificationsSent).values({ kind, targetId: id, recipients: result.sent }).onConflictDoNothing();
+  await logAdmin(me.email, 'email.send', `${kind} #${id} → ${result.sent}`);
   redirect(`/admin/notify?result=sent&n=${result.sent}`);
 }
 
@@ -314,7 +328,8 @@ export async function reorderTools(ids: unknown): Promise<void> {
 }
 
 export async function saveBlockedWords(fd: FormData) {
-  await requireAdmin();
+  const me = await requireAdmin();
   await setBlockedWords(String(fd.get('words') ?? ''));
+  await logAdmin(me.email, 'blocked-words.save');
   redirect('/admin/comments?words=1');
 }

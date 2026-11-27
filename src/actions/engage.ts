@@ -1,6 +1,8 @@
 'use server';
 
 import { and, count, desc, eq, sql } from 'drizzle-orm';
+import { headers } from 'next/headers';
+import { clientIp, countView, visitorKey } from '@/lib/views';
 import { getDb, schema } from '@/db';
 import type { TargetType } from '@/db/schema';
 import { AuthError, getSessionUser, requireUser } from '@/lib/session';
@@ -161,9 +163,11 @@ export async function deleteComment(commentId: unknown): Promise<Result> {
 
 /* ---------- views ---------- */
 
-// Counts one view. No login and nothing about the person is stored; the browser asks at most once an hour per item.
+// Counts one view. No login needed. Only a one-way hash of the visitor's address is kept, for a day,
+// so the same visitor counts once an hour per item.
 export async function addView(type: unknown, id: unknown): Promise<void> {
   if (!isType(type) || !Number.isInteger(id)) return;
+  if (!(await countView(visitorKey(clientIp(await headers())), `${type}:${id}`))) return;
   const db = await getDb();
   const table = type === 'video' ? videos : posts;
   await db

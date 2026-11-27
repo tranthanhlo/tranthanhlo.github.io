@@ -4,7 +4,8 @@ import { isAdminEmail } from '@/lib/admin';
 // The part of the Auth.js setup that also runs in the middleware (no database access here)
 export const authConfig = {
   providers: [],
-  session: { strategy: 'jwt' },
+  // a stolen or forgotten sign-in stops working after a week (Auth.js default: 30 days)
+  session: { strategy: 'jwt', maxAge: 7 * 24 * 60 * 60 },
   pages: { signIn: '/dang-nhap' },
   callbacks: {
     jwt({ token, user }) {

@@ -3,6 +3,8 @@ import path from 'node:path';
 import { put } from '@vercel/blob';
 import { NextResponse } from 'next/server';
 import { getSessionUser } from '@/lib/session';
+import { stripMetadata } from '@/lib/strip-metadata';
+import { logAdmin } from '@/lib/audit';
 
 const TYPES: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp', 'image/gif': 'gif', 'image/avif': 'avif' };
 const MAX = 5 * 1024 * 1024;
@@ -26,11 +28,14 @@ export async function POST(req: Request) {
   const file = (await req.formData()).get('file');
   if (!(file instanceof File)) return NextResponse.json({ error: 'no-file' }, { status: 400 });
   if (file.size > MAX) return NextResponse.json({ error: 'too-big' }, { status: 413 });
-  const bytes = new Uint8Array(await file.arrayBuffer());
-  const type = sniff(bytes);
+  const raw = new Uint8Array(await file.arrayBuffer());
+  const type = sniff(raw);
   if (!type || !TYPES[type]) return NextResponse.json({ error: 'bad-type' }, { status: 415 });
+  // drop GPS position, camera and other hidden details before the picture becomes public
+  const bytes = stripMetadata(raw, type);
 
   const name = `${crypto.randomUUID()}.${TYPES[type]}`;
+  await logAdmin(user.email, 'image.upload', name);
   if (process.env.BLOB_READ_WRITE_TOKEN) {
     const blob = await put(`uploads/${name}`, Buffer.from(bytes), { access: 'public', contentType: type });
     return NextResponse.json({ url: blob.url });

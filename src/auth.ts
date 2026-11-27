@@ -7,6 +7,7 @@ import { eq } from 'drizzle-orm';
 import { getDb, schema } from '@/db';
 import { authConfig } from './auth.config';
 import { devLoginEnabled, isAdminEmail } from '@/lib/admin';
+import { logAdmin } from '@/lib/audit';
 
 export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
   const db = await getDb();
@@ -46,10 +47,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth(async () => {
       // keep the stored role in step with ADMIN_EMAILS
       async signIn({ user }) {
         if (!user.id) return;
+        const admin = isAdminEmail(user.email);
         await db
           .update(schema.users)
-          .set({ role: isAdminEmail(user.email) ? 'admin' : 'member' })
+          .set({ role: admin ? 'admin' : 'member' })
           .where(eq(schema.users.id, user.id));
+        if (admin) await logAdmin(user.email, 'sign-in');
       },
     },
   };

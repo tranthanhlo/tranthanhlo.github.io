@@ -4,11 +4,12 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import * as schema from '@/db/schema';
 import { memoryDb, type TestDb } from './helpers.test-utils';
 
-const state = vi.hoisted(() => ({ db: null as unknown, session: null as null | { user: { id: string; email: string; name: string } } }));
+const state = vi.hoisted(() => ({ db: null as unknown, ip: '10.0.0.1', session: null as null | { user: { id: string; email: string; name: string } } }));
 
 vi.mock('@/db', async () => ({ getDb: async () => state.db, schema: await import('@/db/schema') }));
 vi.mock('@/auth', () => ({ auth: async () => state.session, signIn: vi.fn(), signOut: vi.fn(), handlers: {} }));
-vi.mock('next/cache', () => ({ revalidateTag: vi.fn(), unstable_cache: (fn: () => unknown) => fn }));
+vi.mock('next/headers', () => ({ headers: async () => new Headers({ 'x-real-ip': state.ip }) }));
+vi.mock('next/cache',() => ({ revalidateTag: vi.fn(), unstable_cache: (fn: () => unknown) => fn }));
 vi.mock('next/navigation', () => ({
   redirect: (url: string) => {
     throw new Error(`REDIRECT:${url}`);
@@ -168,12 +169,30 @@ describe('the bell', () => {
 
 describe('views', () => {
   it('counts published items only', async () => {
+    state.ip = '10.0.0.1';
     await engage.addView('video', ids.video);
     await engage.addView('video', ids.draft);
     const [v] = await db.select().from(videos).where(eq(videos.id, ids.video));
     const [d] = await db.select().from(videos).where(eq(videos.id, ids.draft));
     expect(v.views).toBe(1);
     expect(d.views).toBe(0);
+  });
+  it('counts the same visitor once an hour, and never stores the address', async () => {
+    state.ip = '10.0.0.2';
+    await engage.addView('video', ids.video);
+    await engage.addView('video', ids.video);
+    state.ip = '10.0.0.3';
+    await engage.addView('video', ids.video);
+    const [v] = await db.select().from(videos).where(eq(videos.id, ids.video));
+    expect(v.views).toBe(3); // 1 from the test above + 2 visitors
+    const rows = await db.select().from(schema.viewEvents);
+    expect(rows.some((r) => r.visitor.includes('10.0.0'))).toBe(false);
+  });
+  it('caps one visitor at 120 views an hour', async () => {
+    const { countView, VIEW_MAX_PER_WINDOW } = await import('@/lib/views');
+    let counted = 0;
+    for (let i = 0; i < VIEW_MAX_PER_WINDOW + 5; i++) if (await countView('pump', `video:${1000 + i}`)) counted++;
+    expect(counted).toBe(VIEW_MAX_PER_WINDOW);
   });
 });
 
@@ -195,6 +214,14 @@ describe('admin actions', () => {
     await expect(admin.saveVideo(form({ title: 'Từ admin', youtube: 'https://youtu.be/jNQXAC9IVRw', published: 'on' }))).rejects.toThrow('REDIRECT:/admin/videos?saved=1');
     const [row] = await db.select().from(videos).where(eq(videos.title, 'Từ admin'));
     expect(row).toMatchObject({ youtubeId: 'jNQXAC9IVRw', published: true, slug: 'tu-admin' });
+    const log = await db.select().from(schema.adminEvents).where(eq(schema.adminEvents.action, 'video.create'));
+    expect(log).toMatchObject([{ email: 'admin@test.local', target: 'Từ admin' }]);
+  });
+  it('log nothing for refused attempts', async () => {
+    as('alice');
+    await expect(admin.deletePost(form({ id: '1' }))).rejects.toThrow('not-admin');
+    const log = await db.select().from(schema.adminEvents).where(eq(schema.adminEvents.email, 'alice@test.local'));
+    expect(log).toEqual([]);
   });
   it('never store javascript: links for tools', async () => {
     as('admin');

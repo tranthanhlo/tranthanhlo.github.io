@@ -14,6 +14,28 @@ export function emailConfigured(): boolean {
   return !!process.env.RESEND_API_KEY && !!process.env.EMAIL_FROM;
 }
 
+// One plain message (account notices, error alerts). Does nothing when email is not set up.
+export async function sendOne(to: string, subject: string, text: string): Promise<boolean> {
+  if (!emailConfigured() || !to) return false;
+  try {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    const { error } = await resend.emails.send({
+      from: process.env.EMAIL_FROM!,
+      to,
+      subject,
+      text,
+      html: `<div style="font-family:system-ui,sans-serif;max-width:520px;margin:auto;padding:16px;white-space:pre-wrap">${escapeHtml(text)}</div>`,
+    });
+    if (error) console.error('email failed', error.message);
+    return !error;
+  } catch (e) {
+    console.error('email failed', e);
+    return false;
+  }
+}
+
+export const firstAdminEmail = () => (process.env.ADMIN_EMAILS ?? '').split(',')[0].trim();
+
 // Sends in batches of 100. With no RESEND_API_KEY it sends nothing and says so (a "dry run").
 export async function sendMails(mails: Mail[]): Promise<{ sent: number; dryRun: boolean; error?: string }> {
   if (!emailConfigured()) return { sent: 0, dryRun: true };

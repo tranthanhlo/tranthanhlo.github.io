@@ -1,0 +1,75 @@
+# Weekly backup of the production database.
+# The dump is encrypted before it leaves the runner (this repository is public, and so are its
+# artifacts), then restored into a throw-away Postgres to prove it can be restored.
+# Needs two repository secrets: BACKUP_DATABASE_URL and BACKUP_PASSPHRASE (see README → Sao lưu).
+name: Backup
+
+on:
+  schedule:
+    - cron: '0 19 * * 0' # Monday 02:00 in Vietnam
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      # the restore test target; exists only for this job
+      scratch:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: scratch
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      PG: docker run --rm --network host -v ${{ github.workspace }}:/work -w /work -e DATABASE_URL -e PGPASSWORD=scratch postgres:17
+    steps:
+      - name: Check the secrets are set
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "::error::Add BACKUP_DATABASE_URL and BACKUP_PASSPHRASE in Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
+      - name: Dump the database
+        run: $PG sh -c 'pg_dump "$DATABASE_URL" --format=custom --no-owner --no-acl --file=backup.dump'
+
+      - name: Restore it into a scratch database and compare row counts
+        run: |
+          $PG pg_restore --host=localhost --username=postgres --dbname=postgres --no-owner --no-acl --exit-on-error backup.dump
+          cat > counts.sql <<'SQL'
+          select string_agg(format('%s=%s', t, n), ' ' order by t) from (
+            select 'users' t, count(*) n from users union all select 'videos', count(*) from videos union all
+            select 'tools', count(*) from tools union all select 'posts', count(*) from posts union all
+            select 'comments', count(*) from comments) x;
+          SQL
+          src=$($PG sh -c 'psql "$DATABASE_URL" -tA -f counts.sql')
+          dst=$($PG psql --host=localhost --username=postgres --dbname=postgres -tA -f counts.sql)
+          echo "source:   $src"
+          echo "restored: $dst"
+          [ "$src" = "$dst" ] || { echo "::error::Restored row counts differ from the source"; exit 1; }
+
+      - name: Encrypt
+        run: |
+          name="tranthanhlo-db-$(date -u +%Y-%m-%d).dump.gpg"
+          echo "NAME=$name" >> "$GITHUB_ENV"
+          printf '%s' "$PASSPHRASE" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 --output "$name" backup.dump
+          rm -f backup.dump
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.NAME }}
+          path: ${{ env.NAME }}
+          retention-days: 90
+          if-no-files-found: error

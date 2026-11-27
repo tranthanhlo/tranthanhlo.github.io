@@ -8,8 +8,10 @@ export type DB = PgDatabase<PgQueryResultHKT, typeof schema>;
 // The connection is reused across hot reloads.
 const g = globalThis as unknown as { __db?: Promise<DB> };
 
+// The running site uses APP_DATABASE_URL when it is set: a database role that may read and write
+// rows but cannot drop or change tables. DATABASE_URL (the owner) is then only used by migrations.
 async function connect(): Promise<DB> {
-  const url = process.env.DATABASE_URL;
+  const url = process.env.APP_DATABASE_URL || process.env.DATABASE_URL;
   if (url) {
     const { neon } = await import('@neondatabase/serverless');
     const { drizzle } = await import('drizzle-orm/neon-http');

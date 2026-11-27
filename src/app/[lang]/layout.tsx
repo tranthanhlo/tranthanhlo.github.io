@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import { notFound } from 'next/navigation';
 import '../globals.css';
 import { TopBar } from '@/components/TopBar';
@@ -45,11 +46,13 @@ export default async function LangLayout({ children, params }: { children: React
   const ui = t(lang);
   const me = await getSessionUser();
   const unread = me ? (await getNotifications(me.id)).unread : 0;
+  // set by the middleware; the page's Content-Security-Policy only runs scripts carrying it
+  const nonce = (await headers()).get('x-nonce') ?? undefined;
 
   return (
     <html lang={lang} suppressHydrationWarning>
       <head>
-        <script dangerouslySetInnerHTML={{ __html: themeScript }} />
+        <script nonce={nonce} dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body>
         {IS_STAGING && (

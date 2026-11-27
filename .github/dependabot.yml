@@ -1,0 +1,26 @@
+# Opens pull requests when a package or a GitHub Action needs updating.
+# Security fixes arrive as soon as they exist (with "Dependabot security updates" on in the repo settings);
+# ordinary updates are grouped into one weekly pull request each.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    target-branch: staging
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    target-branch: staging
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Ho_Chi_Minh
+    groups:
+      actions:
+        patterns: ['*']
